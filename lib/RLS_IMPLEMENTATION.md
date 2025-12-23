@@ -29,10 +29,10 @@ return await withTenantContext(context, async (tx) => {
   // Session variables are set here automatically
   // RLS policies enforce tenant isolation
   
-  // Query without tenantId filter
+  // Query without tenantId filter or deletedAt filter
   return await tx.student.findMany({
-    where: { isDeleted: false }
-    // No tenantId needed - RLS handles it
+    // No tenantId needed - RLS handles tenant isolation
+    // No deletedAt filter needed - RLS automatically excludes deleted_at IS NOT NULL rows
   })
 })
 ```
@@ -145,9 +145,10 @@ export async function getStudents() {
   
   return await withTenantContext(context, async (tx) => {
     // RLS automatically filters by tenant_id
-    // No where: { tenantId } needed
+    // RLS automatically excludes deleted_at IS NOT NULL rows
+    // No where: { tenantId } or where: { deletedAt: null } needed
     return await tx.student.findMany({
-      where: { isDeleted: false }
+      orderBy: { createdAt: 'desc' }
     })
   })
 }

@@ -124,8 +124,8 @@ export function StudentsTable({ students, onUpdate }: StudentsTableProps) {
                     <div className="text-sm text-slate-500">{student.grade || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge variant={student.isDeleted ? 'danger' : 'success'}>
-                      {student.isDeleted ? 'Deleted' : 'Active'}
+                    <Badge variant={student.deletedAt ? 'danger' : 'success'}>
+                      {student.deletedAt ? 'Deleted' : 'Active'}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

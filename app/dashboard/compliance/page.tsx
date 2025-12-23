@@ -9,6 +9,9 @@ async function getAllComplianceDocuments() {
 
   return await withTenantContext(context, async (tx) => {
     return await tx.driverComplianceDocument.findMany({
+      where: {
+        deletedAt: null
+      },
       include: {
         driver: true,
       },

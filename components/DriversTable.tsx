@@ -136,8 +136,8 @@ export function DriversTable({ drivers, onUpdate }: DriversTableProps) {
                     <div className="text-sm text-slate-900">{driver.licenseNumber || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <Badge variant={driver.isDeleted ? 'danger' : 'success'}>
-                      {driver.isDeleted ? 'Deleted' : 'Active'}
+                    <Badge variant={driver.deletedAt ? 'danger' : 'success'}>
+                      {driver.deletedAt ? 'Deleted' : 'Active'}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
