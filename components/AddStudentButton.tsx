@@ -3,7 +3,6 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Loader2, User, GraduationCap } from 'lucide-react'
-import { createStudent } from '@/lib/actions'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -51,11 +50,23 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
 
     startTransition(async () => {
       try {
-        await createStudent({
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          grade: formData.grade.trim() || undefined,
+        const response = await fetch('/api/students', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            grade: formData.grade.trim() || undefined,
+          }),
         })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to create student')
+        }
+
         toast.success('Student added successfully', {
           description: `${formData.firstName} ${formData.lastName} has been added to the system.`
         })
@@ -71,7 +82,7 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
         }
       } catch (error) {
         toast.error('Failed to add student', {
-          description: 'Please try again or contact support if the problem persists.'
+          description: error instanceof Error ? error.message : 'Please try again or contact support if the problem persists.'
         })
       }
     })
