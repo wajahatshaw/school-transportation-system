@@ -3,7 +3,6 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Loader2, Car, CreditCard } from 'lucide-react'
-import { createDriver } from '@/lib/actions'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -51,11 +50,23 @@ export function AddDriverButton({ onSuccess }: AddDriverButtonProps) {
 
     startTransition(async () => {
       try {
-        await createDriver({
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          licenseNumber: formData.licenseNumber.trim() || undefined,
+        const response = await fetch('/api/drivers', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            licenseNumber: formData.licenseNumber.trim() || undefined,
+          }),
         })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.error || 'Failed to create driver')
+        }
+
         toast.success('Driver added successfully', {
           description: `${formData.firstName} ${formData.lastName} has been added to the system.`
         })
@@ -71,7 +82,7 @@ export function AddDriverButton({ onSuccess }: AddDriverButtonProps) {
         }
       } catch (error) {
         toast.error('Failed to add driver', {
-          description: 'Please try again or contact support if the problem persists.'
+          description: error instanceof Error ? error.message : 'Please try again or contact support if the problem persists.'
         })
       }
     })
