@@ -12,12 +12,9 @@ export async function getStudents() {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // RLS automatically filters by tenant_id
-    // No need to add where: { tenantId }
+    // RLS automatically filters by tenant_id and excludes deleted_at IS NOT NULL rows
+    // No need to add where: { tenantId } or where: { deletedAt: null }
     return await tx.student.findMany({
-      where: {
-        isDeleted: false
-      },
       orderBy: { createdAt: 'desc' }
     })
   })
@@ -74,7 +71,10 @@ export async function softDeleteStudent(id: string) {
     // RLS ensures we can only soft delete our tenant's records
     const student = await tx.student.update({
       where: { id },
-      data: { isDeleted: true }
+      data: {
+        deletedAt: new Date(),
+        deletedBy: context.userId
+      }
     })
     
     // Revalidate both the students page and dashboard
@@ -93,11 +93,9 @@ export async function getDrivers() {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // RLS automatically filters by tenant_id
+    // RLS automatically filters by tenant_id and excludes deleted_at IS NOT NULL rows
+    // No need to add where: { tenantId } or where: { deletedAt: null }
     return await tx.driver.findMany({
-      where: {
-        isDeleted: false
-      },
       orderBy: { createdAt: 'desc' }
     })
   })
@@ -149,7 +147,10 @@ export async function deleteDriver(id: string) {
   return await withTenantContext(context, async (tx) => {
     const driver = await tx.driver.update({
       where: { id },
-      data: { isDeleted: true }
+      data: {
+        deletedAt: new Date(),
+        deletedBy: context.userId
+      }
     })
     
     revalidatePath('/dashboard/drivers')
@@ -168,10 +169,11 @@ export async function getComplianceDocuments(driverId: string) {
   
   return await withTenantContext(context, async (tx) => {
     // RLS ensures we only see our tenant's documents
-    // No need to filter by tenantId
+    // Filter out soft-deleted documents
     return await tx.driverComplianceDocument.findMany({
       where: {
-        driverId
+        driverId,
+        deletedAt: null
       },
       orderBy: { expiresAt: 'asc' }
     })
@@ -246,8 +248,13 @@ export async function deleteComplianceDocument(id: string) {
       throw new Error('Document not found')
     }
     
-    await tx.driverComplianceDocument.delete({
-      where: { id }
+    // Soft delete using UPDATE, not DELETE
+    await tx.driverComplianceDocument.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        deletedBy: context.userId
+      }
     })
     
     revalidatePath(`/dashboard/drivers/${doc.driverId}/compliance`)
@@ -272,7 +279,8 @@ export async function getExpiredComplianceDocuments() {
       where: {
         expiresAt: {
           lt: now
-        }
+        },
+        deletedAt: null
       },
       include: {
         driver: true
@@ -295,7 +303,8 @@ export async function getExpiringComplianceDocuments(days: number = 30) {
         expiresAt: {
           gte: now,
           lte: futureDate
-        }
+        },
+        deletedAt: null
       },
       include: {
         driver: true

@@ -60,7 +60,7 @@ export default async function DriverCompliancePage({
           </div>
           <div>
             <dt className="text-sm font-medium text-slate-500">Status</dt>
-            <dd className="mt-1 text-sm text-slate-900">{driver.isDeleted ? 'Deleted' : 'Active'}</dd>
+            <dd className="mt-1 text-sm text-slate-900">{driver.deletedAt ? 'Deleted' : 'Active'}</dd>
           </div>
         </dl>
       </div>

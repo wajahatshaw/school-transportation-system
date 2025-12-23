@@ -135,7 +135,7 @@ The system uses the following Prisma models:
 ## Key Features Implementation
 
 ### Soft Delete
-Students use soft delete (`isDeleted` flag) - deleted students don't appear in the list but remain in the database for audit purposes.
+Students, drivers, and compliance documents use soft delete (`deleted_at` timestamp and `deleted_by` user ID) - deleted records don't appear in lists but remain in the database for audit purposes. RLS policies automatically exclude records where `deleted_at IS NOT NULL`.
 
 ### Compliance Expiration Tracking
 Compliance documents are automatically highlighted:

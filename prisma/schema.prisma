@@ -40,7 +40,8 @@ model Student {
   firstName  String   @map("first_name")
   lastName   String   @map("last_name")
   grade      String?
-  isDeleted  Boolean? @default(false) @map("is_deleted")
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy  String? @map("deleted_by") @db.Uuid
   createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
 
@@ -55,7 +56,8 @@ model Driver {
   firstName String   @map("first_name")
   lastName  String   @map("last_name")
   licenseNumber String? @map("license_number")
-  isDeleted Boolean? @default(false) @map("is_deleted")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy String? @map("deleted_by") @db.Uuid
   createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
 
@@ -73,6 +75,8 @@ model DriverComplianceDocument {
   issuedAt  DateTime? @map("issued_at") @db.Date
   expiresAt DateTime  @map("expires_at") @db.Date
   fileUrl   String?   @map("file_url")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy String? @map("deleted_by") @db.Uuid
   createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
 

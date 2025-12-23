@@ -19,6 +19,9 @@ async function getAllComplianceDocuments() {
   const context = await getTenantContext()
   return await withTenantContext(context, async (tx) => {
     return await tx.driverComplianceDocument.findMany({
+      where: {
+        deletedAt: null
+      },
       include: { driver: true },
       orderBy: { expiresAt: 'asc' },
     })
