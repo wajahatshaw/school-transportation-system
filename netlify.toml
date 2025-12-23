@@ -7,10 +7,3 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  # Ensure environment variables are available during build
-  NPM_FLAGS = "--legacy-peer-deps"
-
-[functions]
-  # Increase function timeout for database operations
-  node_bundler = "esbuild"
-  external_node_modules = ["@prisma/client", ".prisma/client"]

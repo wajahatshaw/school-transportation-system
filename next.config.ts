@@ -8,10 +8,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '2mb',
     },
   },
-  // Ensure proper output for Netlify
-  outputFileTracingIncludes: {
-    '/api/**/*': ['./node_modules/@prisma/client/**/*', './node_modules/.prisma/client/**/*'],
-  },
 };
 
 export default nextConfig;
