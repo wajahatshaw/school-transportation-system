@@ -6,7 +6,41 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    // Check if request exists and is valid
+    if (!request) {
+      return NextResponse.json(
+        { error: 'Invalid request' },
+        { status: 400 }
+      )
+    }
+
+    // Parse request body with proper error handling for Netlify compatibility
+    // Use text() then parse manually - more reliable on Netlify than request.json()
+    let body: { firstName?: string; lastName?: string; licenseNumber?: string }
+    try {
+      const text = await request.text()
+      if (!text || text.trim() === '') {
+        return NextResponse.json(
+          { error: 'Request body is required' },
+          { status: 400 }
+        )
+      }
+      body = JSON.parse(text)
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError)
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body', details: parseError instanceof Error ? parseError.message : 'Unknown error' },
+        { status: 400 }
+      )
+    }
+
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json(
+        { error: 'Invalid request body format' },
+        { status: 400 }
+      )
+    }
+
     const { firstName, lastName, licenseNumber } = body
 
     if (!firstName || !lastName) {
@@ -17,16 +51,17 @@ export async function POST(request: NextRequest) {
     }
 
     const driver = await createDriver({
-      firstName,
-      lastName,
-      licenseNumber: licenseNumber || undefined,
+      firstName: String(firstName).trim(),
+      lastName: String(lastName).trim(),
+      licenseNumber: licenseNumber ? String(licenseNumber).trim() : undefined,
     })
 
     return NextResponse.json(driver, { status: 201 })
   } catch (error) {
     console.error('Error creating driver:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create driver'
     return NextResponse.json(
-      { error: 'Failed to create driver' },
+      { error: errorMessage },
       { status: 500 }
     )
   }
