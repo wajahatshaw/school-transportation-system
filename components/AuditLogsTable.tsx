@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { AuditLog } from '@prisma/client'
 import { ChevronDown, ChevronRight, Activity } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -85,9 +85,8 @@ export function AuditLogsTable({ logs }: AuditLogsTableProps) {
             {logs.map((log) => {
               const isExpanded = expandedRows.has(log.id)
               return (
-                <>
+                <React.Fragment key={log.id}>
                   <tr
-                    key={log.id}
                     className="hover:bg-slate-50 cursor-pointer transition-colors"
                     onClick={() => toggleRow(log.id)}
                   >
@@ -119,7 +118,7 @@ export function AuditLogsTable({ logs }: AuditLogsTableProps) {
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr>
+                    <tr key={`${log.id}-expanded`}>
                       <td colSpan={6} className="px-4 py-4 bg-slate-50">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-6">
                           {/* Before */}
@@ -172,7 +171,7 @@ export function AuditLogsTable({ logs }: AuditLogsTableProps) {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               )
             })}
           </tbody>

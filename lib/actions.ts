@@ -36,6 +36,7 @@ export async function createStudent(data: { firstName: string; lastName: string;
     // Revalidate both the students page and dashboard
     revalidatePath('/dashboard/students')
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
     
     return student
   })
@@ -59,6 +60,7 @@ export async function updateStudent(id: string, data: { firstName: string; lastN
     // Revalidate both the students page and dashboard
     revalidatePath('/dashboard/students')
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
     
     return student
   })
@@ -80,6 +82,7 @@ export async function softDeleteStudent(id: string) {
     // Revalidate both the students page and dashboard
     revalidatePath('/dashboard/students')
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
     
     return student
   })
@@ -116,6 +119,7 @@ export async function createDriver(data: { firstName: string; lastName: string; 
     
     revalidatePath('/dashboard/drivers')
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
     
     return driver
   })
@@ -136,6 +140,7 @@ export async function updateDriver(id: string, data: { firstName: string; lastNa
     
     revalidatePath('/dashboard/drivers')
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
     
     return driver
   })
@@ -155,6 +160,7 @@ export async function deleteDriver(id: string) {
     
     revalidatePath('/dashboard/drivers')
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
     
     return driver
   })
@@ -204,6 +210,7 @@ export async function createComplianceDocument(data: {
     revalidatePath(`/dashboard/drivers/${data.driverId}/compliance`)
     revalidatePath('/dashboard/compliance')
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
     
     return doc
   })
@@ -229,6 +236,7 @@ export async function updateComplianceDocument(
     revalidatePath(`/dashboard/drivers/${doc.driverId}/compliance`)
     revalidatePath('/dashboard/compliance')
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
     
     return doc
   })
@@ -260,6 +268,7 @@ export async function deleteComplianceDocument(id: string) {
     revalidatePath(`/dashboard/drivers/${doc.driverId}/compliance`)
     revalidatePath('/dashboard/compliance')
     revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
     
     return doc
   })
