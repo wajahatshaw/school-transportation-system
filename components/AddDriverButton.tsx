@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Loader2, Car, CreditCard } from 'lucide-react'
 import { createDriver } from '@/lib/actions'
 import { toast } from 'sonner'
@@ -19,6 +20,7 @@ interface AddDriverButtonProps {
 }
 
 export function AddDriverButton({ onSuccess }: AddDriverButtonProps) {
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [formData, setFormData] = useState({
@@ -61,9 +63,11 @@ export function AddDriverButton({ onSuccess }: AddDriverButtonProps) {
         setFormData({ firstName: '', lastName: '', licenseNumber: '' })
         setErrors({})
         
-        // Call onSuccess to refresh the data
+        // Refresh the page data
         if (onSuccess) {
           onSuccess()
+        } else {
+          router.refresh()
         }
       } catch (error) {
         toast.error('Failed to add driver', {
