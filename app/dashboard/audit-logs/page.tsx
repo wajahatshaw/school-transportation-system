@@ -3,6 +3,9 @@ import { getAuditLogs } from '@/lib/actions'
 import { AuditLogsTable } from '@/components/AuditLogsTable'
 import { TableSkeleton } from '@/components/ui/skeleton'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function AuditLogsPage() {
   return (
     <div className="space-y-6">
