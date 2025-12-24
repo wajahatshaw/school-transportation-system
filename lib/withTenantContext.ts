@@ -63,9 +63,9 @@ export async function withTenantContext<T>(
     await tx.$executeRawUnsafe(
       `SET LOCAL app.current_user_id = '${context.userId}'`
     )
-    await tx.$executeRawUnsafe(
-      `SET LOCAL app.current_user_ip = '${context.ipAddress.replace(/'/g, "''")}'`
-    )
+           await tx.$executeRawUnsafe(
+             `SET LOCAL app.current_user_ip = '${(context.ipAddress || 'unknown').replace(/'/g, "''")}'`
+           )
     
     // CRITICAL: Verify session variables were set correctly
     // This ensures RLS policies will work properly

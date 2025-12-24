@@ -43,20 +43,26 @@ async function getAllComplianceDocuments() {
     }) : []
     const driverMap = new Map(drivers.map(d => [d.id, d]))
     
-    return docs.map(d => ({
-      id: d.id,
-      tenantId: d.tenant_id,
-      driverId: d.driver_id,
-      docType: d.doc_type,
-      issuedAt: d.issued_at,
-      expiresAt: d.expires_at,
-      fileUrl: d.file_url,
-      deletedAt: d.deleted_at,
-      deletedBy: d.deleted_by,
-      createdAt: d.created_at,
-      updatedAt: d.updated_at,
-      driver: driverMap.get(d.driver_id) || null
-    }))
+    return docs
+      .map(d => {
+        const driver = driverMap.get(d.driver_id)
+        if (!driver) return null // Filter out documents without drivers
+        return {
+          id: d.id,
+          tenantId: d.tenant_id,
+          driverId: d.driver_id,
+          docType: d.doc_type,
+          issuedAt: d.issued_at,
+          expiresAt: d.expires_at,
+          fileUrl: d.file_url,
+          deletedAt: d.deleted_at,
+          deletedBy: d.deleted_by,
+          createdAt: d.created_at,
+          updatedAt: d.updated_at,
+          driver
+        }
+      })
+      .filter((doc): doc is NonNullable<typeof doc> => doc !== null)
   })
 }
 

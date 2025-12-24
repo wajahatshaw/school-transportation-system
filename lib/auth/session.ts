@@ -250,11 +250,24 @@ export async function requireAuth(): Promise<Session> {
 /**
  * Requires tenant selection, throws if no tenant selected
  */
-export async function requireTenant(): Promise<Required<Session>> {
+export type SessionWithTenant = Omit<Session, 'tenantId' | 'tenantName' | 'role'> & {
+  tenantId: string
+  tenantName: string
+  role: string
+}
+
+export async function requireTenant(): Promise<SessionWithTenant> {
   const session = await requireAuth()
-  if (!session.tenantId) {
+  if (!session.tenantId || !session.tenantName || !session.role) {
     throw new Error('Tenant selection required')
   }
-  return session as Required<Session>
+  return {
+    userId: session.userId,
+    authUserId: session.authUserId,
+    email: session.email,
+    tenantId: session.tenantId,
+    tenantName: session.tenantName,
+    role: session.role
+  }
 }
 
