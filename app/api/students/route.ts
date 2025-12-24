@@ -1,11 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createStudent } from '@/lib/actions'
+import { getSession } from '@/lib/auth/session'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate authentication and tenant selection
+    const session = await getSession()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+    
+    if (!session.tenantId) {
+      return NextResponse.json(
+        { error: 'Tenant selection required' },
+        { status: 403 }
+      )
+    }
+
     // Check if request exists and is valid
     if (!request) {
       return NextResponse.json(
@@ -60,6 +77,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating student:', error)
     const errorMessage = error instanceof Error ? error.message : 'Failed to create student'
+    
+    // Check for authentication-related errors
+    if (errorMessage.includes('Authentication required') || errorMessage.includes('Tenant selection required')) {
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: 401 }
+      )
+    }
+    
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

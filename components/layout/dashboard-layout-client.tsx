@@ -16,9 +16,11 @@ import { ToastProvider } from '@/components/ui/toast'
 interface DashboardLayoutClientProps {
   children: React.ReactNode
   tenantName: string
+  userEmail: string
+  tenantId: string
 }
 
-export function DashboardLayoutClient({ children, tenantName }: DashboardLayoutClientProps) {
+export function DashboardLayoutClient({ children, tenantName, userEmail, tenantId }: DashboardLayoutClientProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   const navItems = [
@@ -36,7 +38,8 @@ export function DashboardLayoutClient({ children, tenantName }: DashboardLayoutC
       <div className="min-h-screen bg-slate-50">
         <TopBar
           tenantName={tenantName}
-          userName="Admin User"
+          userEmail={userEmail}
+          tenantId={tenantId}
           onMenuClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
 

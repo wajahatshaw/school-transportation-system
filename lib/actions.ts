@@ -12,11 +12,35 @@ export async function getStudents() {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // RLS automatically filters by tenant_id and excludes deleted_at IS NOT NULL rows
-    // No need to add where: { tenantId } or where: { deletedAt: null }
-    return await tx.student.findMany({
-      orderBy: { createdAt: 'desc' }
-    })
+    // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
+    // The view app.v_students automatically filters by tenant_id using session variable
+    const students = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      first_name: string
+      last_name: string
+      grade: string | null
+      deleted_at: Date | null
+      deleted_by: string | null
+      created_at: Date
+      updated_at: Date
+    }>>`
+      SELECT * FROM app.v_students
+      ORDER BY created_at DESC
+    `
+    
+    // Map to Prisma model format
+    return students.map(s => ({
+      id: s.id,
+      tenantId: s.tenant_id,
+      firstName: s.first_name,
+      lastName: s.last_name,
+      grade: s.grade,
+      deletedAt: s.deleted_at,
+      deletedBy: s.deleted_by,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at
+    }))
   })
 }
 
@@ -46,8 +70,15 @@ export async function updateStudent(id: string, data: { firstName: string; lastN
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // RLS ensures we can only update our tenant's records
-    // No need to check tenantId in where clause
+    // WORKAROUND: Explicit tenant check because postgres role has BYPASSRLS
+    // First verify the student belongs to this tenant
+    const existing = await tx.student.findFirst({
+      where: { id, tenantId: context.tenantId }
+    })
+    if (!existing) {
+      throw new Error('Student not found or access denied')
+    }
+    
     const student = await tx.student.update({
       where: { id },
       data: {
@@ -70,7 +101,14 @@ export async function softDeleteStudent(id: string) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // RLS ensures we can only soft delete our tenant's records
+    // WORKAROUND: Explicit tenant check because postgres role has BYPASSRLS
+    const existing = await tx.student.findFirst({
+      where: { id, tenantId: context.tenantId, deletedAt: null }
+    })
+    if (!existing) {
+      throw new Error('Student not found or access denied')
+    }
+    
     const student = await tx.student.update({
       where: { id },
       data: {
@@ -96,11 +134,33 @@ export async function getDrivers() {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // RLS automatically filters by tenant_id and excludes deleted_at IS NOT NULL rows
-    // No need to add where: { tenantId } or where: { deletedAt: null }
-    return await tx.driver.findMany({
-      orderBy: { createdAt: 'desc' }
-    })
+    // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
+    const drivers = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      first_name: string
+      last_name: string
+      license_number: string | null
+      deleted_at: Date | null
+      deleted_by: string | null
+      created_at: Date
+      updated_at: Date
+    }>>`
+      SELECT * FROM app.v_drivers
+      ORDER BY created_at DESC
+    `
+    
+    return drivers.map(d => ({
+      id: d.id,
+      tenantId: d.tenant_id,
+      firstName: d.first_name,
+      lastName: d.last_name,
+      licenseNumber: d.license_number,
+      deletedAt: d.deleted_at,
+      deletedBy: d.deleted_by,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at
+    }))
   })
 }
 
@@ -129,6 +189,14 @@ export async function updateDriver(id: string, data: { firstName: string; lastNa
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
+    // WORKAROUND: Explicit tenant check because postgres role has BYPASSRLS
+    const existing = await tx.driver.findFirst({
+      where: { id, tenantId: context.tenantId }
+    })
+    if (!existing) {
+      throw new Error('Driver not found or access denied')
+    }
+    
     const driver = await tx.driver.update({
       where: { id },
       data: {
@@ -150,6 +218,14 @@ export async function deleteDriver(id: string) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
+    // WORKAROUND: Explicit tenant check because postgres role has BYPASSRLS
+    const existing = await tx.driver.findFirst({
+      where: { id, tenantId: context.tenantId, deletedAt: null }
+    })
+    if (!existing) {
+      throw new Error('Driver not found or access denied')
+    }
+    
     const driver = await tx.driver.update({
       where: { id },
       data: {
@@ -174,15 +250,38 @@ export async function getComplianceDocuments(driverId: string) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // RLS ensures we only see our tenant's documents
-    // Filter out soft-deleted documents
-    return await tx.driverComplianceDocument.findMany({
-      where: {
-        driverId,
-        deletedAt: null
-      },
-      orderBy: { expiresAt: 'asc' }
-    })
+    // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
+    const docs = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      driver_id: string
+      doc_type: string
+      issued_at: Date | null
+      expires_at: Date
+      file_url: string | null
+      deleted_at: Date | null
+      deleted_by: string | null
+      created_at: Date
+      updated_at: Date
+    }>>`
+      SELECT * FROM app.v_driver_compliance_documents
+      WHERE driver_id = ${driverId}::uuid
+      ORDER BY expires_at ASC
+    `
+    
+    return docs.map(d => ({
+      id: d.id,
+      tenantId: d.tenant_id,
+      driverId: d.driver_id,
+      docType: d.doc_type,
+      issuedAt: d.issued_at,
+      expiresAt: d.expires_at,
+      fileUrl: d.file_url,
+      deletedAt: d.deleted_at,
+      deletedBy: d.deleted_by,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at
+    }))
   })
 }
 
@@ -223,6 +322,14 @@ export async function updateComplianceDocument(
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
+    // WORKAROUND: Explicit tenant check because postgres role has BYPASSRLS
+    const existing = await tx.driverComplianceDocument.findFirst({
+      where: { id, tenantId: context.tenantId }
+    })
+    if (!existing) {
+      throw new Error('Document not found or access denied')
+    }
+    
     const doc = await tx.driverComplianceDocument.update({
       where: { id },
       data: {
@@ -246,14 +353,13 @@ export async function deleteComplianceDocument(id: string) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // First get the document to know driverId for revalidation
-    // RLS ensures we can only access our tenant's documents
-    const doc = await tx.driverComplianceDocument.findUnique({
-      where: { id }
+    // WORKAROUND: Explicit tenant check because postgres role has BYPASSRLS
+    const doc = await tx.driverComplianceDocument.findFirst({
+      where: { id, tenantId: context.tenantId, deletedAt: null }
     })
     
     if (!doc) {
-      throw new Error('Document not found')
+      throw new Error('Document not found or access denied')
     }
     
     // Soft delete using UPDATE, not DELETE
@@ -284,18 +390,46 @@ export async function getExpiredComplianceDocuments() {
   return await withTenantContext(context, async (tx) => {
     const now = new Date()
     
-    return await tx.driverComplianceDocument.findMany({
-      where: {
-        expiresAt: {
-          lt: now
-        },
-        deletedAt: null
-      },
-      include: {
-        driver: true
-      },
-      orderBy: { expiresAt: 'asc' }
-    })
+    // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
+    const docs = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      driver_id: string
+      doc_type: string
+      issued_at: Date | null
+      expires_at: Date
+      file_url: string | null
+      deleted_at: Date | null
+      deleted_by: string | null
+      created_at: Date
+      updated_at: Date
+    }>>`
+      SELECT * FROM app.v_driver_compliance_documents
+      WHERE expires_at < ${now}::timestamptz
+      ORDER BY expires_at ASC
+    `
+    
+    // Fetch drivers separately (view doesn't include relations)
+    const driverIds = [...new Set(docs.map(d => d.driver_id))]
+    const drivers = driverIds.length > 0 ? await tx.driver.findMany({
+      where: { id: { in: driverIds }, tenantId: context.tenantId }
+    }) : []
+    const driverMap = new Map(drivers.map(d => [d.id, d]))
+    
+    return docs.map(d => ({
+      id: d.id,
+      tenantId: d.tenant_id,
+      driverId: d.driver_id,
+      docType: d.doc_type,
+      issuedAt: d.issued_at,
+      expiresAt: d.expires_at,
+      fileUrl: d.file_url,
+      deletedAt: d.deleted_at,
+      deletedBy: d.deleted_by,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
+      driver: driverMap.get(d.driver_id) || null
+    }))
   })
 }
 
@@ -307,19 +441,47 @@ export async function getExpiringComplianceDocuments(days: number = 30) {
     const futureDate = new Date()
     futureDate.setDate(futureDate.getDate() + days)
     
-    return await tx.driverComplianceDocument.findMany({
-      where: {
-        expiresAt: {
-          gte: now,
-          lte: futureDate
-        },
-        deletedAt: null
-      },
-      include: {
-        driver: true
-      },
-      orderBy: { expiresAt: 'asc' }
-    })
+    // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
+    const docs = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      driver_id: string
+      doc_type: string
+      issued_at: Date | null
+      expires_at: Date
+      file_url: string | null
+      deleted_at: Date | null
+      deleted_by: string | null
+      created_at: Date
+      updated_at: Date
+    }>>`
+      SELECT * FROM app.v_driver_compliance_documents
+      WHERE expires_at >= ${now}::timestamptz
+        AND expires_at <= ${futureDate}::timestamptz
+      ORDER BY expires_at ASC
+    `
+    
+    // Fetch drivers separately
+    const driverIds = [...new Set(docs.map(d => d.driver_id))]
+    const drivers = driverIds.length > 0 ? await tx.driver.findMany({
+      where: { id: { in: driverIds }, tenantId: context.tenantId }
+    }) : []
+    const driverMap = new Map(drivers.map(d => [d.id, d]))
+    
+    return docs.map(d => ({
+      id: d.id,
+      tenantId: d.tenant_id,
+      driverId: d.driver_id,
+      docType: d.doc_type,
+      issuedAt: d.issued_at,
+      expiresAt: d.expires_at,
+      fileUrl: d.file_url,
+      deletedAt: d.deleted_at,
+      deletedBy: d.deleted_by,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at,
+      driver: driverMap.get(d.driver_id) || null
+    }))
   })
 }
 
@@ -331,16 +493,50 @@ export async function getAuditLogs(filters?: { tableName?: string; action?: stri
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // RLS automatically filters audit logs by tenant_id
-    // No need to add where: { tenantId }
-    return await tx.auditLog.findMany({
-      where: {
-        ...(filters?.tableName && { tableName: filters.tableName }),
-        ...(filters?.action && { action: filters.action })
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100
-    })
+    // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
+    let query = `SELECT * FROM app.v_audit_logs WHERE 1=1`
+    const params: any[] = []
+    let paramIndex = 1
+    
+    if (filters?.tableName) {
+      query += ` AND table_name = $${paramIndex}`
+      params.push(filters.tableName)
+      paramIndex++
+    }
+    
+    if (filters?.action) {
+      query += ` AND action = $${paramIndex}`
+      params.push(filters.action)
+      paramIndex++
+    }
+    
+    query += ` ORDER BY created_at DESC LIMIT 100`
+    
+    const logs = await tx.$queryRawUnsafe<Array<{
+      id: string
+      tenant_id: string
+      table_name: string
+      record_id: string
+      action: string
+      before: any
+      after: any
+      user_id: string
+      ip: string | null
+      created_at: Date
+    }>>(query, ...params)
+    
+    return logs.map(l => ({
+      id: l.id,
+      tenantId: l.tenant_id,
+      tableName: l.table_name,
+      recordId: l.record_id,
+      action: l.action,
+      before: l.before,
+      after: l.after,
+      userId: l.user_id,
+      ip: l.ip,
+      createdAt: l.created_at
+    }))
   })
 }
 
@@ -367,9 +563,36 @@ export async function getDriverById(driverId: string) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // RLS ensures we can only access our tenant's drivers
-    return await tx.driver.findUnique({
-      where: { id: driverId }
-    })
+    // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
+    const drivers = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      first_name: string
+      last_name: string
+      license_number: string | null
+      deleted_at: Date | null
+      deleted_by: string | null
+      created_at: Date
+      updated_at: Date
+    }>>`
+      SELECT * FROM app.v_drivers
+      WHERE id = ${driverId}::uuid
+      LIMIT 1
+    `
+    
+    if (drivers.length === 0) return null
+    
+    const d = drivers[0]
+    return {
+      id: d.id,
+      tenantId: d.tenant_id,
+      firstName: d.first_name,
+      lastName: d.last_name,
+      licenseNumber: d.license_number,
+      deletedAt: d.deleted_at,
+      deletedBy: d.deleted_by,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at
+    }
   })
 }

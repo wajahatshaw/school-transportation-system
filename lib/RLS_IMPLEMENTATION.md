@@ -1,18 +1,20 @@
-# Row Level Security (RLS) Implementation Guide
+# Database-Level Tenant Isolation Implementation
 
-This document explains how database-enforced tenant isolation is implemented using Postgres Row Level Security (RLS) and session variables.
+This document explains how tenant isolation is enforced at the database level using triggers and views.
 
 ## Architecture Overview
 
 ### Key Principles
 
-1. **Database-Enforced Security**: All tenant isolation is enforced at the database level via RLS policies, not in application code.
+1. **Database-Enforced Security**: All tenant isolation is enforced at the database level, not in application code.
 
 2. **Session Variables**: Postgres session variables (`app.current_tenant_id`, `app.current_user_id`, `app.current_user_ip`) are set at the start of each transaction.
 
-3. **No Application-Level Filtering**: Prisma queries do NOT include `where: { tenantId }` clauses. RLS automatically filters results.
+3. **Triggers for Writes**: Database triggers enforce tenant isolation for INSERT/UPDATE/DELETE operations.
 
-4. **Trigger-Based Audit Logging**: All audit logs are created by database triggers, not application code.
+4. **Views for Reads**: Database views filter results by tenant for SELECT operations.
+
+5. **Trigger-Based Audit Logging**: All audit logs are created by database triggers automatically.
 
 ## How It Works
 
@@ -27,13 +29,11 @@ const context = await getTenantContext()
 // 2. Execute query in transaction with session variables
 return await withTenantContext(context, async (tx) => {
   // Session variables are set here automatically
-  // RLS policies enforce tenant isolation
+  // Triggers enforce tenant isolation for writes
+  // Views enforce tenant isolation for reads
   
-  // Query without tenantId filter or deletedAt filter
-  return await tx.student.findMany({
-    // No tenantId needed - RLS handles tenant isolation
-    // No deletedAt filter needed - RLS automatically excludes deleted_at IS NOT NULL rows
-  })
+  // For SELECT: Use views (app.v_students, app.v_drivers, etc.)
+  // For INSERT/UPDATE/DELETE: Use base tables (triggers protect them)
 })
 ```
 
@@ -46,33 +46,49 @@ The `withTenantContext` helper:
    - `SET LOCAL app.current_user_id = '...'`
    - `SET LOCAL app.current_user_ip = '...'`
 3. Executes the callback with the transaction client
-4. All queries in the callback are automatically scoped by RLS
+4. All operations are automatically scoped by triggers/views
 
-### 3. RLS Policies (Database Side)
+### 3. Database Triggers (Write Protection)
 
-The database must have RLS policies like:
+Triggers enforce tenant isolation for INSERT/UPDATE/DELETE:
 
 ```sql
--- Enable RLS on all tenant-scoped tables
-ALTER TABLE students ENABLE ROW LEVEL SECURITY;
-ALTER TABLE drivers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE driver_compliance_documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
-
--- Example policy for students table
-CREATE POLICY tenant_isolation_students ON students
-  FOR ALL
-  USING (tenant_id = current_setting('app.current_tenant_id', true)::uuid);
-
--- Similar policies for other tables...
+CREATE TRIGGER enforce_tenant_isolation_students
+  BEFORE INSERT OR UPDATE OR DELETE
+  ON students
+  FOR EACH ROW
+  EXECUTE FUNCTION app.enforce_students_tenant_isolation();
 ```
 
-### 4. Database Triggers
+These triggers:
+- Validate that `tenant_id` matches the session variable
+- Prevent changing `tenant_id` on UPDATE
+- Raise errors if tenant access is denied
 
-The database must have triggers that:
-1. Set `tenant_id` on INSERT based on `app.current_tenant_id`
-2. Create audit log entries on INSERT/UPDATE/DELETE
-3. Capture `user_id` and `ip` from session variables
+### 4. Database Views (Read Protection)
+
+Views filter results by tenant for SELECT operations:
+
+```sql
+CREATE VIEW app.v_students AS
+SELECT * FROM public.students
+WHERE tenant_id = app.get_current_tenant_id()
+  AND deleted_at IS NULL;
+```
+
+Views automatically filter by tenant using the session variable.
+
+### 5. Audit Triggers
+
+Audit triggers automatically log all changes:
+
+```sql
+CREATE TRIGGER audit_students
+  AFTER INSERT OR UPDATE OR DELETE
+  ON students
+  FOR EACH ROW
+  EXECUTE FUNCTION audit_trigger();
+```
 
 ## Implementation Details
 
@@ -81,122 +97,67 @@ The database must have triggers that:
 Core helper that:
 - Validates UUID and IP formats
 - Sets Postgres session variables in a transaction
+- Verifies session variables are set correctly
 - Provides type-safe transaction client to callbacks
 
 ### `lib/actions.ts`
 
 All server actions:
 - Use `withTenantContext` for every database operation
-- Do NOT filter by `tenantId` in Prisma queries
-- Do NOT manually create audit logs
-- Rely entirely on RLS and triggers
+- Use views (`app.v_*`) for SELECT operations
+- Use base tables for INSERT/UPDATE/DELETE (triggers protect them)
+- Do NOT manually create audit logs (triggers handle this)
 
-### `lib/getTenantContext()`
+### SELECT Operations
 
-Currently a placeholder that:
-- Gets the first tenant (for demo)
-- Returns a demo user ID and IP
+All SELECT queries use views:
 
-**In Production**, replace with:
 ```typescript
-export async function getTenantContext(request: Request): Promise<TenantContext> {
-  const session = await getSession(request)
-  
-  return {
-    tenantId: session.tenantId,
-    userId: session.userId,
-    ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0] 
-      || request.headers.get('x-real-ip') 
-      || 'unknown'
+const students = await tx.$queryRaw`
+  SELECT * FROM app.v_students
+  ORDER BY created_at DESC
+`
+```
+
+Available views:
+- `app.v_students`
+- `app.v_drivers`
+- `app.v_driver_compliance_documents`
+- `app.v_audit_logs`
+
+### INSERT/UPDATE/DELETE Operations
+
+All write operations use base tables (triggers protect them):
+
+```typescript
+const student = await tx.student.create({
+  data: {
+    tenantId: context.tenantId,  // Must match session variable
+    firstName: data.firstName,
+    lastName: data.lastName
   }
-}
+})
 ```
 
-## Example Usage
-
-### Creating a Student
-
-```typescript
-export async function createStudent(data: { firstName: string; lastName: string }) {
-  const context = await getTenantContext()
-  
-  return await withTenantContext(context, async (tx) => {
-    // No tenantId in data - trigger sets it from session variable
-    const student = await tx.student.create({
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName
-      }
-    })
-    
-    // Audit log created automatically by trigger
-    // No manual logAudit() call needed
-    
-    return student
-  })
-}
-```
-
-### Reading Students
-
-```typescript
-export async function getStudents() {
-  const context = await getTenantContext()
-  
-  return await withTenantContext(context, async (tx) => {
-    // RLS automatically filters by tenant_id
-    // RLS automatically excludes deleted_at IS NOT NULL rows
-    // No where: { tenantId } or where: { deletedAt: null } needed
-    return await tx.student.findMany({
-      orderBy: { createdAt: 'desc' }
-    })
-  })
-}
-```
-
-### Reading Audit Logs
-
-```typescript
-export async function getAuditLogs() {
-  const context = await getTenantContext()
-  
-  return await withTenantContext(context, async (tx) => {
-    // RLS ensures we only see our tenant's audit logs
-    return await tx.auditLog.findMany({
-      orderBy: { createdAt: 'desc' }
-    })
-  })
-}
-```
+Triggers automatically:
+- Validate tenant_id matches session variable
+- Create audit log entries
+- Prevent tenant_id changes on UPDATE
 
 ## Security Benefits
 
-1. **Cannot Bypass**: Even if application code is modified, RLS policies still enforce isolation.
+1. **Cannot Bypass**: Even if application code is modified, triggers and views still enforce isolation.
 
-2. **Audit Trail**: All changes are logged by database triggers, ensuring complete audit coverage.
+2. **Database-Level**: All enforcement happens at the database level, not in application code.
 
-3. **Performance**: RLS policies are evaluated at the database level, which is efficient.
+3. **Audit Trail**: All changes are logged by database triggers automatically.
 
 4. **Compliance**: Meets requirements for compliance-focused applications where data isolation must be database-enforced.
 
-## Testing
+## Migration Files
 
-To test RLS enforcement:
-
-1. Set up two different tenants
-2. Create data for each tenant
-3. Verify that queries from one tenant cannot see the other tenant's data
-4. Verify that attempting to access another tenant's data returns empty results or errors
-
-## Migration Checklist
-
-When deploying to production:
-
-- [ ] Replace `getTenantContext()` with real auth extraction
-- [ ] Ensure RLS policies are enabled on all tenant-scoped tables
-- [ ] Verify database triggers are in place
-- [ ] Test with multiple tenants to verify isolation
-- [ ] Verify audit logs are being created by triggers
-- [ ] Remove any remaining `where: { tenantId }` clauses from queries
-- [ ] Remove any manual `logAudit()` calls
-
+Essential migration files:
+- `enforce-tenant-isolation-triggers.sql` - Creates triggers for write protection
+- `complete-db-level-tenant-isolation.sql` - Creates views for read protection
+- `fix-audit-trigger.sql` - Fixes audit trigger to use correct function names
+- `fix-helper-functions-rls.sql` - Creates helper functions for reading session variables
