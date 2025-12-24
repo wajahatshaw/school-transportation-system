@@ -25,15 +25,15 @@ function createPrismaClient() {
   }
 
   // Create or reuse connection pool (singleton to prevent connection exhaustion)
-  // For Supabase session pooler, use max: 1 connection per pool
-  // Session pooler mode has strict limits and requires conservative connection management
+  // Supabase session pooler typically allows 4-10 connections per pooler
+  // We use a reasonable size to handle concurrent requests without exhausting limits
   if (!globalForPool.pool) {
     globalForPool.pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max: 1, // Must be 1 for Supabase session pooler (port 5432)
+      max: 4, // Allow concurrent transactions (Supabase session pooler limit is typically higher)
       min: 0, // Allow pool to close idle connections
-      idleTimeoutMillis: 20000, // Close idle connections after 20s
-      connectionTimeoutMillis: 5000, // Fail fast if can't connect
+      idleTimeoutMillis: 30000, // Close idle connections after 30s
+      connectionTimeoutMillis: 10000, // Wait up to 10s for a connection
       allowExitOnIdle: true, // Allow process to exit when pool is idle
     })
   }
