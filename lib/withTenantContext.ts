@@ -47,16 +47,42 @@ export async function withTenantContext<T>(
     // Set Postgres session variables for RLS enforcement
     // These must be set BEFORE any queries in the transaction
     // Using $executeRawUnsafe with validated inputs
+    
+    // Set session variables for RLS enforcement
+    // Using SET LOCAL - these are transaction-scoped and will be cleared when transaction ends
     await tx.$executeRawUnsafe(
       `SET LOCAL app.current_tenant_id = '${context.tenantId}'`
     )
     await tx.$executeRawUnsafe(
       `SET LOCAL app.current_user_id = '${context.userId}'`
     )
-    await tx.$executeRawUnsafe(
-      `SET LOCAL app.current_user_ip = '${context.ipAddress.replace(/'/g, "''")}'`
+           await tx.$executeRawUnsafe(
+             `SET LOCAL app.current_user_ip = '${(context.ipAddress || 'unknown').replace(/'/g, "''")}'`
+           )
+    
+    // CRITICAL: Verify session variables were set correctly
+    // This ensures RLS policies will work properly
+    const verifyResult = await tx.$queryRawUnsafe<Array<{
+      tenant_id: string | null
+      user_id: string | null
+    }>>(
+      `SELECT 
+        current_setting('app.current_tenant_id', true)::uuid as tenant_id,
+        current_setting('app.current_user_id', true)::uuid as user_id
+      `
     )
-
+    
+    const verified = verifyResult[0]
+    if (!verified || verified.tenant_id !== context.tenantId || verified.user_id !== context.userId) {
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ Session variables verification failed:', {
+          expected: { tenantId: context.tenantId, userId: context.userId },
+          actual: verified
+        })
+      }
+      throw new Error('Failed to set session variables for RLS enforcement')
+    }
+    
     // Execute the callback with the transaction client
     // All queries here will be automatically scoped by RLS
     return await callback(tx)
@@ -64,37 +90,49 @@ export async function withTenantContext<T>(
 }
 
 /**
- * Helper to get tenant context from request headers/cookies
- * In production, this would extract from auth session
+ * Helper to get tenant context from auth session and request
+ * This is the ONLY way to get tenant context - never trust client input
  * 
- * For now, this is a placeholder that demonstrates the pattern
+ * @param ipAddress - Optional IP address from request headers
+ * @returns TenantContext with validated user and tenant IDs
+ * @throws Error if user is not authenticated or tenant is not selected
  */
-export async function getTenantContext(): Promise<TenantContext> {
-  // TODO: In production, extract from:
-  // - Authentication session (userId, tenantId)
-  // - Request headers (ipAddress from x-forwarded-for or similar)
+export async function getTenantContext(ipAddress?: string): Promise<TenantContext> {
+  // Import here to avoid circular dependency
+  const { requireTenant } = await import('./auth/session')
   
-  // For demo purposes, we'll get the first tenant and create a demo user
-  // In production, replace this with actual auth extraction
+  // Get authenticated session with tenant
+  // This will throw if user is not authenticated or tenant not selected
+  const session = await requireTenant()
   
-  const tenant = await prisma.tenant.findFirst()
-  if (!tenant) {
-    throw new Error('No tenant found. Please create a tenant first.')
-  }
-
-  // In production, get from session:
-  // const session = await getSession()
-  // return {
-  //   tenantId: session.tenantId,
-  //   userId: session.userId,
-  //   ipAddress: request.headers.get('x-forwarded-for') || request.ip || 'unknown'
-  // }
-
-  // Demo implementation - replace with real auth
   return {
-    tenantId: tenant.id,
-    userId: '00000000-0000-0000-0000-000000000000', // Demo user ID
-    ipAddress: '127.0.0.1' // Demo IP
+    tenantId: session.tenantId,
+    userId: session.userId,
+    ipAddress: ipAddress || '127.0.0.1' // Fallback to localhost if no IP provided
   }
+}
+
+/**
+ * Helper to get IP address from Next.js headers
+ * Use this in Server Actions and API routes
+ */
+export async function getClientIp(): Promise<string> {
+  const { headers } = await import('next/headers')
+  const headersList = await headers()
+  
+  // Try various headers that might contain client IP
+  const forwarded = headersList.get('x-forwarded-for')
+  if (forwarded) {
+    // x-forwarded-for can contain multiple IPs, get the first one
+    return forwarded.split(',')[0].trim()
+  }
+  
+  const realIp = headersList.get('x-real-ip')
+  if (realIp) {
+    return realIp
+  }
+  
+  // Fallback
+  return '127.0.0.1'
 }
 

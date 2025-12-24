@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Menu, X, ChevronDown } from 'lucide-react'
+import { Menu, LogOut, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { logoutAction } from '@/lib/auth/actions'
+import { useRouter } from 'next/navigation'
 
 interface SidebarProps {
   isCollapsed: boolean
@@ -44,12 +46,22 @@ export function Sidebar({ isCollapsed, onToggle, children }: SidebarProps) {
 
 interface TopBarProps {
   tenantName: string
-  userName?: string
+  userEmail: string
+  tenantId: string
   onMenuClick: () => void
 }
 
-export function TopBar({ tenantName, userName, onMenuClick }: TopBarProps) {
+export function TopBar({ tenantName, userEmail, tenantId, onMenuClick }: TopBarProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const router = useRouter()
+
+  async function handleLogout() {
+    await logoutAction()
+  }
+
+  function handleSwitchTenant() {
+    router.push('/select-tenant')
+  }
 
   return (
     <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 z-50">
@@ -77,10 +89,13 @@ export function TopBar({ tenantName, userName, onMenuClick }: TopBarProps) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-          {/* Tenant switcher placeholder */}
-          <button className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
-            <span>Switch Tenant</span>
-            <ChevronDown className="h-4 w-4" />
+          {/* Tenant switcher */}
+          <button 
+            onClick={handleSwitchTenant}
+            className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+            title="Switch organization"
+          >
+            <RefreshCw className="h-4 w-4" />
           </button>
 
           {/* User menu */}
@@ -90,21 +105,39 @@ export function TopBar({ tenantName, userName, onMenuClick }: TopBarProps) {
               className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
             >
               <div className="h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm font-semibold">
-                {userName?.[0]?.toUpperCase() || 'U'}
+                {userEmail[0]?.toUpperCase() || 'U'}
               </div>
-              <span className="hidden sm:inline">{userName || 'User'}</span>
+              <span className="hidden sm:inline max-w-[150px] truncate">{userEmail}</span>
             </button>
 
-            {/* User dropdown - placeholder */}
+            {/* User dropdown */}
             {isUserMenuOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1">
-                <button className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100">
-                  Settings
-                </button>
-                <button className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100">
-                  Sign out
-                </button>
-              </div>
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setIsUserMenuOpen(false)}
+                />
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+                  <div className="px-4 py-2 border-b border-slate-200">
+                    <p className="text-xs text-slate-500">Signed in as</p>
+                    <p className="text-sm font-medium text-slate-900 truncate">{userEmail}</p>
+                  </div>
+                  <button 
+                    onClick={handleSwitchTenant}
+                    className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 flex items-center gap-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Switch Organization
+                  </button>
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

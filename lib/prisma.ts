@@ -8,6 +8,12 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
+// Global pool and adapter instances to share across requests
+const globalForPool = globalThis as unknown as {
+  pool: Pool | undefined
+  adapter: PrismaPg | undefined
+}
+
 // Function to create Prisma client with proper error handling
 function createPrismaClient() {
   // Validate that DATABASE_URL is set
@@ -18,23 +24,38 @@ function createPrismaClient() {
     )
   }
 
-  // Create a connection pool
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-  })
+  // Create or reuse connection pool (singleton to prevent connection exhaustion)
+  // For Supabase session pooler, use max: 1 connection per pool
+  // Session pooler mode has strict limits and requires conservative connection management
+  if (!globalForPool.pool) {
+    globalForPool.pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 1, // Must be 1 for Supabase session pooler (port 5432)
+      min: 0, // Allow pool to close idle connections
+      idleTimeoutMillis: 20000, // Close idle connections after 20s
+      connectionTimeoutMillis: 5000, // Fail fast if can't connect
+      allowExitOnIdle: true, // Allow process to exit when pool is idle
+    })
+  }
 
-  // Create the adapter
-  const adapter = new PrismaPg(pool)
+  // Create or reuse adapter (reuses the same pool)
+  if (!globalForPool.adapter) {
+    globalForPool.adapter = new PrismaPg(globalForPool.pool)
+  }
 
-  // Create PrismaClient with adapter
+  // Create PrismaClient with shared adapter
   return new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    adapter: globalForPool.adapter,
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   })
 }
 
 export const prisma =
   globalForPrisma.prisma ?? createPrismaClient()
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+// In production (Netlify/serverless), we still want singleton behavior
+// to prevent connection exhaustion
+if (!globalForPrisma.prisma) {
+  globalForPrisma.prisma = prisma
+}
 
