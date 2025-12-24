@@ -48,13 +48,6 @@ export async function withTenantContext<T>(
     // These must be set BEFORE any queries in the transaction
     // Using $executeRawUnsafe with validated inputs
     
-    // DEBUG: Log what we're setting
-    console.log('🔐 Setting session variables:', {
-      tenant_id: context.tenantId,
-      user_id: context.userId,
-      ip: context.ipAddress
-    })
-    
     // Set session variables for RLS enforcement
     // Using SET LOCAL - these are transaction-scoped and will be cleared when transaction ends
     await tx.$executeRawUnsafe(
@@ -81,18 +74,15 @@ export async function withTenantContext<T>(
     
     const verified = verifyResult[0]
     if (!verified || verified.tenant_id !== context.tenantId || verified.user_id !== context.userId) {
-      console.error('❌ Session variables verification failed:', {
-        expected: { tenantId: context.tenantId, userId: context.userId },
-        actual: verified
-      })
+      if (process.env.NODE_ENV === 'development') {
+        console.error('❌ Session variables verification failed:', {
+          expected: { tenantId: context.tenantId, userId: context.userId },
+          actual: verified
+        })
+      }
       throw new Error('Failed to set session variables for RLS enforcement')
     }
     
-    console.log('✅ Verified session variables in DB:', {
-      tenant_id: verified.tenant_id,
-      user_id: verified.user_id
-    })
-
     // Execute the callback with the transaction client
     // All queries here will be automatically scoped by RLS
     return await callback(tx)

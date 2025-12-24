@@ -31,8 +31,10 @@ export default function TenantSelector({ tenants, userEmail }: TenantSelectorPro
       if (result?.error) {
         setError(result.error)
         setLoading(false)
+      } else if (result?.success) {
+        // Redirect to dashboard on success
+        window.location.href = '/dashboard'
       }
-      // If successful, selectTenantAction will redirect automatically
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to select organization')
       setLoading(false)

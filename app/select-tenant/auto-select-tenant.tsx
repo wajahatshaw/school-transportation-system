@@ -18,9 +18,9 @@ export default function AutoSelectTenant({ tenantId }: AutoSelectTenantProps) {
         const result = await autoSelectTenantAction(tenantId)
         if (result?.error) {
           setError(result.error)
-        } else {
+        } else if (result?.success) {
           // Redirect to dashboard on success
-          router.push('/dashboard')
+          window.location.href = '/dashboard'
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to select tenant')

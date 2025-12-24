@@ -1,17 +1,28 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { loginAction, signupAction } from '@/lib/auth/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignup, setIsSignup] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
+
+  // Helper to check if error is a Next.js redirect (should be ignored)
+  function isRedirectError(error: unknown): boolean {
+    if (error && typeof error === 'object' && 'digest' in error) {
+      const digest = (error as { digest?: string }).digest
+      return digest === 'NEXT_REDIRECT'
+    }
+    return false
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -24,21 +35,32 @@ export default function LoginPage() {
         const result = await signupAction(email, password)
         if (result?.error) {
           setError(result.error)
+          setLoading(false)
         } else {
           setSuccess('Account created! Please check your email to verify your account, then log in.')
           setIsSignup(false)
           setPassword('')
+          setLoading(false)
         }
       } else {
         const result = await loginAction(email, password)
         if (result?.error) {
           setError(result.error)
+          setLoading(false)
+        } else if (result?.success) {
+          // Success - redirect to tenant selection
+          router.push('/select-tenant')
+          router.refresh()
+          // Don't set loading to false here - let the redirect happen
         }
-        // If successful, loginAction will redirect automatically
       }
     } catch (err) {
+      // Ignore Next.js redirect errors (they're expected behavior)
+      if (isRedirectError(err)) {
+        // Redirect is happening, let it proceed
+        return
+      }
       setError(err instanceof Error ? err.message : 'An error occurred')
-    } finally {
       setLoading(false)
     }
   }

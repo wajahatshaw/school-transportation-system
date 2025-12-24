@@ -19,8 +19,8 @@ export async function loginAction(email: string, password: string) {
     return { error: error.message }
   }
   
-  // Redirect to tenant selection
-  redirect('/select-tenant')
+  // Return success - client will handle redirect
+  return { success: true }
 }
 
 /**
@@ -47,7 +47,8 @@ export async function signupAction(email: string, password: string) {
 export async function selectTenantAction(tenantId: string) {
   try {
     await setSelectedTenant(tenantId)
-    redirect('/dashboard')
+    // Return success - client will handle redirect
+    return { success: true }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Failed to select tenant' }
   }
