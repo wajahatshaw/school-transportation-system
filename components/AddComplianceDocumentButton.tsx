@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Loader2, FileText, Calendar } from 'lucide-react'
 import { createComplianceDocument } from '@/lib/actions'
 import { toast } from 'sonner'
@@ -19,6 +20,7 @@ interface AddComplianceDocumentButtonProps {
 }
 
 export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentButtonProps) {
+  const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [formData, setFormData] = useState({
@@ -63,6 +65,8 @@ export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentB
         setIsOpen(false)
         setFormData({ docType: '', issuedAt: '', expiresAt: '', fileUrl: '' })
         setErrors({})
+        // Refresh the page to show the new document
+        router.refresh()
       } catch (error) {
         toast.error('Failed to add document', {
           description: 'Please try again or contact support if the problem persists.'

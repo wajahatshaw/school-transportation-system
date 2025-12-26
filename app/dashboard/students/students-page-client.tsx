@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Student } from '@prisma/client'
 import { getStudents } from '@/lib/actions'
@@ -14,6 +14,11 @@ export function StudentsPageClient({ initialStudents }: StudentsPageClientProps)
   const [students, setStudents] = useState(initialStudents)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  // Sync state when props change (after router.refresh())
+  useEffect(() => {
+    setStudents(initialStudents)
+  }, [initialStudents])
 
   const handleUpdate = () => {
     startTransition(async () => {
