@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Driver } from '@prisma/client'
 import { getDrivers } from '@/lib/actions'
@@ -14,6 +14,11 @@ export function DriversPageClient({ initialDrivers }: DriversPageClientProps) {
   const [drivers, setDrivers] = useState(initialDrivers)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
+
+  // Sync state when props change (after router.refresh())
+  useEffect(() => {
+    setDrivers(initialDrivers)
+  }, [initialDrivers])
 
   const handleUpdate = () => {
     startTransition(async () => {

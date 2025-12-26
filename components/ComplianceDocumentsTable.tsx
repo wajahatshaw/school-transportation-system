@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { DriverComplianceDocument } from '@prisma/client'
 import { Pencil, Trash2, CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
 import { updateComplianceDocument, deleteComplianceDocument } from '@/lib/actions'
@@ -25,6 +25,11 @@ export function ComplianceDocumentsTable({
   const [editingDoc, setEditingDoc] = useState<DriverComplianceDocument | null>(null)
   const [deletingDoc, setDeletingDoc] = useState<DriverComplianceDocument | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Sync state when props change (after router.refresh())
+  useEffect(() => {
+    setDocuments(initialDocuments)
+  }, [initialDocuments])
 
   const handleUpdate = async (data: {
     docType: string
