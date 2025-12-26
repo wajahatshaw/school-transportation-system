@@ -55,7 +55,6 @@ export function AddDriverButton({ onSuccess }: AddDriverButtonProps) {
           headers: {
             'Content-Type': 'application/json',
           },
-          cache: 'no-store',
           body: JSON.stringify({
             firstName: formData.firstName.trim(),
             lastName: formData.lastName.trim(),
