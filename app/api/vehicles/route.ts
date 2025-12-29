@@ -74,6 +74,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (capacity > 60) {
+      return NextResponse.json(
+        { error: 'Capacity cannot be more than 60' },
+        { status: 400 }
+      )
+    }
+
     const vehicle = await createVehicle({
       name: String(name).trim(),
       capacity: Number(capacity),

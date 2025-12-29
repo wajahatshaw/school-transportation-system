@@ -657,6 +657,13 @@ export async function createVehicle(data: {
 }) {
   const context = await getTenantContext()
   
+  if (!Number.isInteger(data.capacity) || data.capacity <= 0) {
+    throw new Error('Capacity must be a positive integer')
+  }
+  if (data.capacity > 60) {
+    throw new Error('Capacity cannot be more than 60')
+  }
+
   return await withTenantContext(context, async (tx) => {
     const vehicle = await tx.vehicle.create({
       data: {
@@ -688,6 +695,13 @@ export async function updateVehicle(
 ) {
   const context = await getTenantContext()
   
+  if (!Number.isInteger(data.capacity) || data.capacity <= 0) {
+    throw new Error('Capacity must be a positive integer')
+  }
+  if (data.capacity > 60) {
+    throw new Error('Capacity cannot be more than 60')
+  }
+
   return await withTenantContext(context, async (tx) => {
     // WORKAROUND: Explicit tenant check because postgres role has BYPASSRLS
     const existing = await tx.vehicle.findFirst({
@@ -789,6 +803,20 @@ export async function getVehicleById(vehicleId: string) {
 // ROUTE CRUD - All operations rely on RLS
 // ============================================================================
 
+function normalizeJsonValue<T = unknown>(value: unknown): T | unknown {
+  if (typeof value !== 'string') return value
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return value
+  }
+}
+
+function normalizeStops(value: unknown): unknown[] {
+  const normalized = normalizeJsonValue(value)
+  return Array.isArray(normalized) ? normalized : []
+}
+
 export async function getRoutes() {
   const context = await getTenantContext()
   
@@ -833,7 +861,7 @@ export async function getRoutes() {
       type: r.type,
       vehicleId: r.vehicle_id,
       driverId: r.driver_id,
-      stops: r.stops,
+      stops: normalizeStops(r.stops),
       deletedAt: r.deleted_at,
       deletedBy: r.deleted_by,
       createdAt: r.created_at,
@@ -994,7 +1022,7 @@ export async function getRouteById(routeId: string) {
       type: r.type,
       vehicleId: r.vehicle_id,
       driverId: r.driver_id,
-      stops: r.stops,
+      stops: normalizeStops(r.stops),
       deletedAt: r.deleted_at,
       deletedBy: r.deleted_by,
       createdAt: r.created_at,
@@ -1174,7 +1202,7 @@ export async function getRoutesByType(type: 'AM' | 'PM') {
       type: r.type,
       vehicleId: r.vehicle_id,
       driverId: r.driver_id,
-      stops: r.stops,
+      stops: normalizeStops(r.stops),
       deletedAt: r.deleted_at,
       deletedBy: r.deleted_by,
       createdAt: r.created_at,

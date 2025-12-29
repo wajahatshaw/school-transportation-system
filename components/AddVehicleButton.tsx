@@ -19,6 +19,7 @@ interface AddVehicleButtonProps {
 }
 
 export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
+  const MAX_VEHICLE_CAPACITY = 60
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -42,6 +43,8 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
       const capacityNum = parseInt(formData.capacity)
       if (isNaN(capacityNum) || capacityNum <= 0) {
         newErrors.capacity = 'Capacity must be a positive number'
+      } else if (capacityNum > MAX_VEHICLE_CAPACITY) {
+        newErrors.capacity = `Maximum capacity is ${MAX_VEHICLE_CAPACITY} seats`
       }
     }
     
@@ -135,7 +138,7 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
             </div>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} noValidate className="space-y-6">
             <div className="space-y-4">
               {/* Vehicle Name */}
               <div className="space-y-2">
@@ -165,6 +168,8 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
                   id="capacity"
                   type="number"
                   min="1"
+                  max={MAX_VEHICLE_CAPACITY}
+                  step="1"
                   value={formData.capacity}
                   onChange={(e) => handleChange('capacity', e.target.value)}
                   placeholder="e.g., 20"
@@ -174,7 +179,7 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
                 {errors.capacity && (
                   <p className="text-sm text-red-600">{errors.capacity}</p>
                 )}
-                <p className="text-xs text-slate-500">Number of students the vehicle can accommodate</p>
+                <p className="text-xs text-slate-500">Number of students the vehicle can accommodate (1–{MAX_VEHICLE_CAPACITY})</p>
               </div>
 
               {/* Vehicle Type */}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { Loader2, MapPin, Plus, Trash2 } from 'lucide-react'
 import {
   Dialog,
@@ -77,6 +77,10 @@ export function EditRouteModal({ route, vehicles, drivers, onClose, onSave }: Ed
   // Parse existing stops or initialize empty array
   const parseStops = (stopsData: any): Stop[] => {
     try {
+      // Some DB/driver combos can return JSONB as a string when using raw queries
+      if (typeof stopsData === 'string') {
+        stopsData = JSON.parse(stopsData)
+      }
       if (Array.isArray(stopsData)) {
         return stopsData.map((stop, index) => ({
           address: stop.address || '',
@@ -97,6 +101,19 @@ export function EditRouteModal({ route, vehicles, drivers, onClose, onSave }: Ed
   })
   const [stops, setStops] = useState<Stop[]>(parseStops(route.stops))
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Ensure modal is correctly prefilled if route prop changes (or modal is reopened quickly)
+  useEffect(() => {
+    setFormData({
+      name: route.name,
+      type: route.type as 'AM' | 'PM',
+      vehicleId: route.vehicleId || '',
+      driverId: route.driverId || '',
+    })
+    setStops(parseStops(route.stops))
+    setErrors({})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.id])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
