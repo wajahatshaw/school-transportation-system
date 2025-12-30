@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Loader2, User, GraduationCap } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input, Label } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { getRoutes } from '@/lib/actions'
 
 interface AddStudentButtonProps {
   onSuccess?: () => void
@@ -22,12 +23,30 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [routes, setRoutes] = useState<any[]>([])
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     grade: '',
+    routeId: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Load routes when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      loadRoutes()
+    }
+  }, [isOpen])
+
+  const loadRoutes = async () => {
+    try {
+      const routesData = await getRoutes()
+      setRoutes(routesData.filter(r => !r.deletedAt))
+    } catch (error) {
+      console.error('Failed to load routes:', error)
+    }
+  }
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -59,6 +78,7 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
             firstName: formData.firstName.trim(),
             lastName: formData.lastName.trim(),
             grade: formData.grade.trim() || undefined,
+            routeId: formData.routeId || undefined,
           }),
         })
 
@@ -71,7 +91,7 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
           description: `${formData.firstName} ${formData.lastName} has been added to the system.`
         })
         setIsOpen(false)
-        setFormData({ firstName: '', lastName: '', grade: '' })
+        setFormData({ firstName: '', lastName: '', grade: '', routeId: '' })
         setErrors({})
         
         // Refresh the page data
@@ -98,7 +118,7 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
   const handleClose = () => {
     if (!isPending) {
       setIsOpen(false)
-      setFormData({ firstName: '', lastName: '', grade: '' })
+      setFormData({ firstName: '', lastName: '', grade: '', routeId: '' })
       setErrors({})
     }
   }
@@ -185,6 +205,30 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
                   />
                 </div>
                 <p className="text-xs text-slate-500">Optional: Specify the student's grade level</p>
+              </div>
+
+              {/* Route Assignment */}
+              <div className="space-y-2">
+                <Label htmlFor="routeId" className="text-sm font-medium text-slate-700">
+                  Assign to Route
+                </Label>
+                <select
+                  id="routeId"
+                  value={formData.routeId}
+                  onChange={(e) => handleChange('routeId', e.target.value)}
+                  disabled={isPending}
+                  className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">No route (assign later)</option>
+                  {routes.map((route) => (
+                    <option key={route.id} value={route.id}>
+                      {route.name} ({route.type})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500">
+                  Optional: Assign student to a route for daily trips
+                </p>
               </div>
             </div>
 

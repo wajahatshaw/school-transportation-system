@@ -44,7 +44,7 @@ export async function getStudents() {
   })
 }
 
-export async function createStudent(data: { firstName: string; lastName: string; grade?: string }) {
+export async function createStudent(data: { firstName: string; lastName: string; grade?: string; routeId?: string }) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
@@ -53,7 +53,8 @@ export async function createStudent(data: { firstName: string; lastName: string;
         tenantId: context.tenantId,
         firstName: data.firstName,
         lastName: data.lastName,
-        grade: data.grade
+        grade: data.grade,
+        routeId: data.routeId
       }
     })
     
@@ -1210,3 +1211,588 @@ export async function getRoutesByType(type: 'AM' | 'PM') {
     }))
   })
 }
+
+// ============================================================================
+// ROUTE TRIP CRUD - Milestone 3: Attendance & Trip Execution
+// ============================================================================
+
+export async function getRouteTrips(filters?: {
+  routeId?: string
+  driverId?: string
+  startDate?: Date
+  endDate?: Date
+  routeType?: 'AM' | 'PM'
+  includeConfirmed?: boolean
+  limit?: number
+  offset?: number
+  sort?: 'asc' | 'desc'
+}) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Build dynamic query
+    let query = `SELECT * FROM app.v_route_trips WHERE 1=1`
+    const params: any[] = []
+    let paramIndex = 1
+    
+    if (filters?.routeId) {
+      query += ` AND route_id = $${paramIndex}::uuid`
+      params.push(filters.routeId)
+      paramIndex++
+    }
+    
+    if (filters?.driverId) {
+      query += ` AND driver_id = $${paramIndex}::uuid`
+      params.push(filters.driverId)
+      paramIndex++
+    }
+    
+    if (filters?.startDate) {
+      query += ` AND trip_date >= $${paramIndex}::date`
+      params.push(filters.startDate)
+      paramIndex++
+    }
+    
+    if (filters?.endDate) {
+      query += ` AND trip_date <= $${paramIndex}::date`
+      params.push(filters.endDate)
+      paramIndex++
+    }
+    
+    if (filters?.routeType) {
+      query += ` AND route_type = $${paramIndex}`
+      params.push(filters.routeType)
+      paramIndex++
+    }
+    
+    if (filters?.includeConfirmed === false) {
+      query += ` AND confirmed_at IS NULL`
+    }
+    
+    const sortDir = (filters?.sort || 'desc').toUpperCase()
+    query += ` ORDER BY trip_date ${sortDir}, route_type ${sortDir}`
+
+    if (typeof filters?.limit === 'number') {
+      query += ` LIMIT $${paramIndex}`
+      params.push(filters.limit)
+      paramIndex++
+    }
+    if (typeof filters?.offset === 'number') {
+      query += ` OFFSET $${paramIndex}`
+      params.push(filters.offset)
+      paramIndex++
+    }
+    
+    const trips = await tx.$queryRawUnsafe<Array<{
+      id: string
+      tenant_id: string
+      route_id: string
+      trip_date: Date
+      route_type: string
+      driver_id: string | null
+      confirmed_at: Date | null
+      confirmed_by: string | null
+      created_at: Date
+    }>>(query, ...params)
+    
+    // Fetch related data
+    const routeIds = [...new Set(trips.map(t => t.route_id))]
+    const driverIds = [...new Set(trips.map(t => t.driver_id).filter((id): id is string => id !== null))]
+    
+    const routes = routeIds.length > 0 ? await tx.route.findMany({
+      where: { id: { in: routeIds }, tenantId: context.tenantId }
+    }) : []
+    
+    const drivers = driverIds.length > 0 ? await tx.driver.findMany({
+      where: { id: { in: driverIds }, tenantId: context.tenantId }
+    }) : []
+    
+    const routeMap = new Map(routes.map(r => [r.id, r]))
+    const driverMap = new Map(drivers.map(d => [d.id, d]))
+    
+    return trips.map(t => ({
+      id: t.id,
+      tenantId: t.tenant_id,
+      routeId: t.route_id,
+      tripDate: t.trip_date,
+      routeType: t.route_type,
+      driverId: t.driver_id,
+      confirmedAt: t.confirmed_at,
+      confirmedBy: t.confirmed_by,
+      createdAt: t.created_at,
+      route: routeMap.get(t.route_id) || null,
+      driver: t.driver_id ? driverMap.get(t.driver_id) || null : null
+    }))
+  })
+}
+
+export async function getTripById(tripId: string) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Use Prisma model directly with explicit tenant scoping.
+    // This avoids edge cases where the session variable isn't set for the view.
+    const trip = await tx.routeTrip.findFirst({
+      where: { id: tripId, tenantId: context.tenantId },
+      include: {
+        route: true,
+        driver: true
+      }
+    })
+
+    if (!trip) return null
+
+    return {
+      id: trip.id,
+      tenantId: trip.tenantId,
+      routeId: trip.routeId,
+      tripDate: trip.tripDate,
+      routeType: trip.routeType,
+      driverId: trip.driverId,
+      confirmedAt: trip.confirmedAt,
+      confirmedBy: trip.confirmedBy,
+      createdAt: trip.createdAt,
+      route: trip.route,
+      driver: trip.driver
+    }
+  })
+}
+
+export async function getTodayTrips(routeType?: 'AM' | 'PM') {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  
+  return await getRouteTrips({
+    startDate: today,
+    endDate: today,
+    routeType
+  })
+}
+
+export async function createRouteTrip(data: {
+  routeId: string
+  tripDate: Date
+  routeType: 'AM' | 'PM'
+  driverId?: string
+}) {
+  const context = await getTenantContext()
+  
+  // Validate route type
+  if (data.routeType !== 'AM' && data.routeType !== 'PM') {
+    throw new Error('Route type must be AM or PM')
+  }
+  
+  return await withTenantContext(context, async (tx) => {
+    // Verify route exists and belongs to tenant
+    const route = await tx.route.findFirst({
+      where: { id: data.routeId, tenantId: context.tenantId }
+    })
+    if (!route) {
+      throw new Error('Route not found or access denied')
+    }
+    
+    // Verify driver exists and belongs to tenant if provided
+    if (data.driverId) {
+      const driver = await tx.driver.findFirst({
+        where: { id: data.driverId, tenantId: context.tenantId }
+      })
+      if (!driver) {
+        throw new Error('Driver not found or access denied')
+      }
+    }
+    
+    // Check if trip already exists
+    const existing = await tx.routeTrip.findFirst({
+      where: {
+        routeId: data.routeId,
+        tripDate: data.tripDate,
+        routeType: data.routeType
+      }
+    })
+    
+    if (existing) {
+      throw new Error('Trip already exists for this route, date, and type')
+    }
+    
+    const trip = await tx.routeTrip.create({
+      data: {
+        tenantId: context.tenantId,
+        routeId: data.routeId,
+        tripDate: data.tripDate,
+        routeType: data.routeType,
+        driverId: data.driverId || route.driverId
+      }
+    })
+    
+    revalidatePath('/dashboard/attendance')
+    revalidatePath('/dashboard/my-trips')
+    revalidatePath('/dashboard/audit-logs')
+    
+    return trip
+  })
+}
+
+export async function confirmTrip(tripId: string) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Verify trip exists and belongs to tenant
+    const existing = await tx.routeTrip.findFirst({
+      where: { id: tripId, tenantId: context.tenantId }
+    })
+    if (!existing) {
+      throw new Error('Trip not found or access denied')
+    }
+    
+    // Check if already confirmed
+    if (existing.confirmedAt) {
+      throw new Error('Trip is already confirmed')
+    }
+    
+    const trip = await tx.routeTrip.update({
+      where: { id: tripId },
+      data: {
+        confirmedAt: new Date(),
+        confirmedBy: context.userId
+      }
+    })
+    
+    revalidatePath('/dashboard/attendance')
+    revalidatePath('/dashboard/my-trips')
+    revalidatePath(`/dashboard/my-trips/${tripId}`)
+    revalidatePath('/dashboard/audit-logs')
+    
+    return trip
+  })
+}
+
+export async function getTripsByDateRange(startDate: Date, endDate: Date) {
+  return await getRouteTrips({ startDate, endDate })
+}
+
+// ============================================================================
+// ATTENDANCE CRUD - Milestone 3: Attendance & Trip Execution
+// ============================================================================
+
+export async function getTripAttendance(tripId: string) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    const attendance = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      trip_id: string
+      student_id: string
+      status: string
+      marked_at: Date
+      marked_by: string
+    }>>`
+      SELECT * FROM app.v_attendance_records
+      WHERE trip_id = ${tripId}::uuid
+      ORDER BY marked_at ASC
+    `
+    
+    // Fetch students
+    const studentIds = [...new Set(attendance.map(a => a.student_id))]
+    const students = studentIds.length > 0 ? await tx.student.findMany({
+      where: { id: { in: studentIds }, tenantId: context.tenantId }
+    }) : []
+    
+    const studentMap = new Map(students.map(s => [s.id, s]))
+    
+    return attendance.map(a => ({
+      id: a.id,
+      tenantId: a.tenant_id,
+      tripId: a.trip_id,
+      studentId: a.student_id,
+      status: a.status,
+      markedAt: a.marked_at,
+      markedBy: a.marked_by,
+      student: studentMap.get(a.student_id) || null
+    }))
+  })
+}
+
+export async function markAttendance(
+  tripId: string,
+  studentId: string,
+  status: 'boarded' | 'absent' | 'no_show'
+) {
+  const context = await getTenantContext()
+  
+  if (!tripId) {
+    throw new Error('Trip ID is required')
+  }
+  if (!studentId) {
+    throw new Error('Student ID is required')
+  }
+
+  // Validate status
+  if (!['boarded', 'absent', 'no_show'].includes(status)) {
+    throw new Error('Invalid status. Must be boarded, absent, or no_show')
+  }
+  
+  return await withTenantContext(context, async (tx) => {
+    // Verify trip exists and belongs to tenant
+    const trip = await tx.routeTrip.findFirst({
+      where: { id: tripId, tenantId: context.tenantId }
+    })
+    if (!trip) {
+      throw new Error('Trip not found or access denied')
+    }
+    
+    // Check if trip is confirmed
+    if (trip.confirmedAt) {
+      throw new Error('Cannot mark attendance for confirmed trip')
+    }
+    
+    // Verify student exists and belongs to tenant
+    const student = await tx.student.findFirst({
+      where: { id: studentId, tenantId: context.tenantId }
+    })
+    if (!student) {
+      throw new Error('Student not found or access denied')
+    }
+    
+    // Check if attendance already exists
+    const existing = await tx.attendanceRecord.findFirst({
+      where: {
+        tripId,
+        studentId
+      }
+    })
+    
+    if (existing) {
+      // Update existing attendance
+      const updated = await tx.attendanceRecord.update({
+        where: { id: existing.id },
+        data: {
+          status,
+          markedAt: new Date(),
+          markedBy: context.userId
+        },
+        include: { student: true }
+      })
+      
+      revalidatePath('/dashboard/attendance')
+      revalidatePath('/dashboard/my-trips')
+      revalidatePath(`/dashboard/my-trips/${tripId}`)
+      revalidatePath(`/dashboard/attendance/${tripId}`)
+      revalidatePath('/dashboard/audit-logs')
+      
+      return updated
+    } else {
+      // Create new attendance record
+      const attendance = await tx.attendanceRecord.create({
+        data: {
+          tenant: { connect: { id: context.tenantId } },
+          trip: { connect: { id: tripId } },
+          student: { connect: { id: studentId } },
+          status,
+          markedBy: context.userId
+        },
+        include: { student: true }
+      })
+      
+      revalidatePath('/dashboard/attendance')
+      revalidatePath('/dashboard/my-trips')
+      revalidatePath(`/dashboard/my-trips/${tripId}`)
+      revalidatePath(`/dashboard/attendance/${tripId}`)
+      revalidatePath('/dashboard/audit-logs')
+      
+      return attendance
+    }
+  })
+}
+
+export async function updateAttendance(
+  attendanceId: string,
+  status: 'boarded' | 'absent' | 'no_show'
+) {
+  const context = await getTenantContext()
+  
+  // Validate status
+  if (!['boarded', 'absent', 'no_show'].includes(status)) {
+    throw new Error('Invalid status. Must be boarded, absent, or no_show')
+  }
+  
+  return await withTenantContext(context, async (tx) => {
+    // Verify attendance exists and belongs to tenant
+    const existing = await tx.attendanceRecord.findFirst({
+      where: { id: attendanceId, tenantId: context.tenantId },
+      include: { trip: true }
+    })
+    if (!existing) {
+      throw new Error('Attendance record not found or access denied')
+    }
+    
+    // Check if trip is confirmed
+    if (existing.trip.confirmedAt) {
+      throw new Error('Cannot update attendance for confirmed trip')
+    }
+    
+    const attendance = await tx.attendanceRecord.update({
+      where: { id: attendanceId },
+      data: {
+        status,
+        markedAt: new Date(),
+        markedBy: context.userId
+      }
+    })
+    
+    revalidatePath('/dashboard/attendance')
+    revalidatePath('/dashboard/my-trips')
+    revalidatePath(`/dashboard/my-trips/${existing.tripId}`)
+    revalidatePath(`/dashboard/attendance/${existing.tripId}`)
+    revalidatePath('/dashboard/audit-logs')
+    
+    return attendance
+  })
+}
+
+export async function addStudentToTrip(tripId: string, studentId: string) {
+  const context = await getTenantContext()
+  
+  if (!tripId) {
+    throw new Error('Trip ID is required')
+  }
+  if (!studentId) {
+    throw new Error('Student ID is required')
+  }
+
+  return await withTenantContext(context, async (tx) => {
+    // Verify trip exists and belongs to tenant
+    const trip = await tx.routeTrip.findFirst({
+      where: { id: tripId, tenantId: context.tenantId }
+    })
+    if (!trip) {
+      throw new Error('Trip not found or access denied')
+    }
+    
+    // Check if trip is confirmed
+    if (trip.confirmedAt) {
+      throw new Error('Cannot add student to confirmed trip')
+    }
+    
+    // Verify student exists and belongs to tenant
+    const student = await tx.student.findFirst({
+      where: { id: studentId, tenantId: context.tenantId }
+    })
+    if (!student) {
+      throw new Error('Student not found or access denied')
+    }
+    
+    // Check if student already has attendance record for this trip
+    const existing = await tx.attendanceRecord.findFirst({
+      where: { tripId, studentId }
+    })
+    
+    if (existing) {
+      throw new Error('Student is already on this trip')
+    }
+    
+    // Add student with no status yet (will be marked later)
+    const attendance = await tx.attendanceRecord.create({
+      data: {
+        tenant: { connect: { id: context.tenantId } },
+        trip: { connect: { id: tripId } },
+        student: { connect: { id: studentId } },
+        status: 'absent', // Default to absent until marked
+        markedBy: context.userId
+      },
+      include: { student: true }
+    })
+    
+    revalidatePath('/dashboard/attendance')
+    revalidatePath('/dashboard/my-trips')
+    revalidatePath(`/dashboard/my-trips/${tripId}`)
+    revalidatePath(`/dashboard/attendance/${tripId}`)
+    revalidatePath('/dashboard/audit-logs')
+    
+    return attendance
+  })
+}
+
+export async function removeStudentFromTrip(tripId: string, studentId: string) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Find attendance record
+    const attendance = await tx.attendanceRecord.findFirst({
+      where: {
+        tripId,
+        studentId,
+        tenantId: context.tenantId
+      },
+      include: { trip: true }
+    })
+    
+    if (!attendance) {
+      throw new Error('Attendance record not found or access denied')
+    }
+    
+    // Check if trip is confirmed
+    if (attendance.trip.confirmedAt) {
+      throw new Error('Cannot remove student from confirmed trip')
+    }
+    
+    await tx.attendanceRecord.delete({
+      where: { id: attendance.id }
+    })
+    
+    revalidatePath('/dashboard/attendance')
+    revalidatePath('/dashboard/my-trips')
+    revalidatePath(`/dashboard/my-trips/${tripId}`)
+    revalidatePath(`/dashboard/attendance/${tripId}`)
+    revalidatePath('/dashboard/audit-logs')
+    
+    return { success: true }
+  })
+}
+
+export async function getStudentsForTrip(tripId: string) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Get trip
+    const trip = await getTripById(tripId)
+    if (!trip) {
+      throw new Error('Trip not found')
+    }
+    
+    // Get all students assigned to the route
+    const students = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      first_name: string
+      last_name: string
+      grade: string | null
+      route_id: string | null
+      deleted_at: Date | null
+      deleted_by: string | null
+      created_at: Date
+      updated_at: Date
+    }>>`
+      SELECT * FROM app.v_students
+      WHERE route_id = ${trip.routeId}::uuid
+      ORDER BY last_name, first_name
+    `
+    
+    return students.map(s => ({
+      id: s.id,
+      tenantId: s.tenant_id,
+      firstName: s.first_name,
+      lastName: s.last_name,
+      grade: s.grade,
+      routeId: s.route_id,
+      deletedAt: s.deleted_at,
+      deletedBy: s.deleted_by,
+      createdAt: s.created_at,
+      updatedAt: s.updated_at
+    }))
+  })
+}
+

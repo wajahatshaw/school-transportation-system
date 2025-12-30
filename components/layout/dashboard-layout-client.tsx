@@ -7,6 +7,8 @@ import {
   Car, 
   Bus,
   MapPin,
+  ClipboardCheck,
+  Route,
   FileCheck, 
   ScrollText,
   Settings as SettingsIcon
@@ -31,6 +33,8 @@ export function DashboardLayoutClient({ children, tenantName, userEmail, tenantI
     { href: '/dashboard/drivers', label: 'Drivers', icon: Car },
     { href: '/dashboard/vehicles', label: 'Vehicles', icon: Bus },
     { href: '/dashboard/routes', label: 'Routes', icon: MapPin },
+    { href: '/dashboard/my-trips', label: 'My Trips', icon: Route },
+    { href: '/dashboard/attendance', label: 'Attendance', icon: ClipboardCheck },
     { href: '/dashboard/compliance', label: 'Compliance', icon: FileCheck },
     { href: '/dashboard/audit-logs', label: 'Audit Logs', icon: ScrollText },
     { href: '/dashboard/settings', label: 'Settings', icon: SettingsIcon },

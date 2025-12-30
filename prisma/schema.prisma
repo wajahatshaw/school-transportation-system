@@ -18,6 +18,8 @@ model Tenant {
   auditLogs                   AuditLog[]
   vehicles                    Vehicle[]
   routes                      Route[]
+  routeTrips                  RouteTrip[]
+  attendanceRecords           AttendanceRecord[]
 
   @@map("tenants")
 }
@@ -48,8 +50,9 @@ model Student {
   createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
 
-  tenant     Tenant   @relation(fields: [tenantId], references: [id])
-  route      Route?   @relation(fields: [routeId], references: [id])
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  route      Route?              @relation(fields: [routeId], references: [id])
+  attendance AttendanceRecord[]
 
   @@map("students")
 }
@@ -65,9 +68,10 @@ model Driver {
   createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
 
-  tenant    Tenant                       @relation(fields: [tenantId], references: [id])
+  tenant      Tenant                       @relation(fields: [tenantId], references: [id])
   compliances DriverComplianceDocument[]
-  routes    Route[]
+  routes      Route[]
+  trips       RouteTrip[]
 
   @@map("drivers")
 }
@@ -150,10 +154,49 @@ model Route {
   createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
 
-  tenant    Tenant    @relation(fields: [tenantId], references: [id])
-  vehicle   Vehicle?  @relation(fields: [vehicleId], references: [id])
-  driver    Driver?   @relation(fields: [driverId], references: [id])
+  tenant    Tenant      @relation(fields: [tenantId], references: [id])
+  vehicle   Vehicle?    @relation(fields: [vehicleId], references: [id])
+  driver    Driver?     @relation(fields: [driverId], references: [id])
   students  Student[]
+  trips     RouteTrip[]
 
   @@map("routes")
 }
+
+model RouteTrip {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  routeId       String    @map("route_id") @db.Uuid
+  tripDate      DateTime  @map("trip_date") @db.Date
+  routeType     String    @map("route_type")
+  driverId      String?   @map("driver_id") @db.Uuid
+  confirmedAt   DateTime? @map("confirmed_at") @db.Timestamptz(6)
+  confirmedBy   String?   @map("confirmed_by") @db.Uuid
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+  route         Route               @relation(fields: [routeId], references: [id])
+  driver        Driver?             @relation(fields: [driverId], references: [id])
+  attendance    AttendanceRecord[]
+
+  @@unique([routeId, tripDate, routeType])
+  @@map("route_trips")
+}
+
+model AttendanceRecord {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  tripId      String   @map("trip_id") @db.Uuid
+  studentId   String   @map("student_id") @db.Uuid
+  status      String
+  markedAt    DateTime @default(now()) @map("marked_at") @db.Timestamptz(6)
+  markedBy    String   @map("marked_by") @db.Uuid
+
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  trip        RouteTrip  @relation(fields: [tripId], references: [id])
+  student     Student    @relation(fields: [studentId], references: [id])
+
+  @@unique([tripId, studentId])
+  @@map("attendance_records")
+}
+
