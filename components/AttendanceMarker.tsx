@@ -21,6 +21,7 @@ interface AttendanceMarkerProps {
   student: Student
   currentStatus: AttendanceStatus
   isConfirmed: boolean
+  isReadOnly?: boolean
   onStatusChange?: (updated: { studentId: string; status: 'boarded' | 'absent' | 'no_show'; markedAt?: string | Date }) => void
 }
 
@@ -29,6 +30,7 @@ export function AttendanceMarker({
   student,
   currentStatus,
   isConfirmed,
+  isReadOnly = false,
   onStatusChange
 }: AttendanceMarkerProps) {
   const [isPending, startTransition] = useTransition()
@@ -37,6 +39,12 @@ export function AttendanceMarker({
   const handleStatusChange = async (status: 'boarded' | 'absent' | 'no_show') => {
     if (isConfirmed) {
       toast.error('Cannot modify confirmed trip')
+      return
+    }
+    if (isReadOnly) {
+      toast.error('This trip is read-only', {
+        description: 'This trip is locked.'
+      })
       return
     }
 
@@ -111,7 +119,7 @@ export function AttendanceMarker({
       <div className="flex gap-2 ml-4">
         <Button
           onClick={() => handleStatusChange('boarded')}
-          disabled={isPending || isConfirmed}
+          disabled={isPending || isConfirmed || isReadOnly}
           size="sm"
           variant={localStatus === 'boarded' ? 'default' : 'outline'}
           className={localStatus === 'boarded' ? 'bg-green-600 hover:bg-green-700' : 'hover:bg-green-50 hover:text-green-600'}
@@ -122,7 +130,7 @@ export function AttendanceMarker({
         
         <Button
           onClick={() => handleStatusChange('absent')}
-          disabled={isPending || isConfirmed}
+          disabled={isPending || isConfirmed || isReadOnly}
           size="sm"
           variant={localStatus === 'absent' ? 'default' : 'outline'}
           className={localStatus === 'absent' ? 'bg-yellow-600 hover:bg-yellow-700' : 'hover:bg-yellow-50 hover:text-yellow-600'}
@@ -133,7 +141,7 @@ export function AttendanceMarker({
         
         <Button
           onClick={() => handleStatusChange('no_show')}
-          disabled={isPending || isConfirmed}
+          disabled={isPending || isConfirmed || isReadOnly}
           size="sm"
           variant={localStatus === 'no_show' ? 'default' : 'outline'}
           className={localStatus === 'no_show' ? 'bg-red-600 hover:bg-red-700' : 'hover:bg-red-50 hover:text-red-600'}

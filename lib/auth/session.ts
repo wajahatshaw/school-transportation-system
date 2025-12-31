@@ -14,6 +14,7 @@ export interface Session {
   tenantId: string | null
   tenantName: string | null
   role: string | null
+  driverId?: string | null
 }
 
 /**
@@ -125,6 +126,7 @@ export async function getSession(): Promise<Session | null> {
   let tenantId: string | null = null
   let tenantName: string | null = null
   let role: string | null = null
+  let driverId: string | null = null
   
   console.log('🍪 Session cookie raw value:', sessionCookie?.value)
   
@@ -164,6 +166,7 @@ export async function getSession(): Promise<Session | null> {
           if (membership) {
             tenantName = membership.tenant.name
             role = membership.role
+            driverId = (membership as any).driverId ?? null
             console.log('🏢 Tenant details:', { tenantName, role })
           }
         }
@@ -174,13 +177,36 @@ export async function getSession(): Promise<Session | null> {
     }
   }
   
+  // For driver accounts, derive driverId from drivers table (source of truth for trip assignment).
+  // This prevents leaking other drivers' trips if memberships.driver_id is missing/misconfigured.
+  if (tenantId && role === 'driver') {
+    try {
+      const found = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id
+        FROM public.drivers
+        WHERE tenant_id = ${tenantId}::uuid
+          AND deleted_at IS NULL
+          AND (
+            auth_user_id = ${authUser.id}::uuid
+            OR lower(email) = lower(${authUser.email!})
+          )
+        LIMIT 1
+      `
+      driverId = found[0]?.id ?? null
+    } catch (e) {
+      console.error('Failed to derive driverId from drivers table:', e)
+      driverId = null
+    }
+  }
+
   const session = {
     userId: internalUser.id,
     authUserId: authUser.id,
     email: authUser.email!,
     tenantId,
     tenantName,
-    role
+    role,
+    driverId
   }
   
   console.log('📦 Final session:', { 
@@ -254,6 +280,7 @@ export type SessionWithTenant = Omit<Session, 'tenantId' | 'tenantName' | 'role'
   tenantId: string
   tenantName: string
   role: string
+  driverId?: string | null
 }
 
 export async function requireTenant(): Promise<SessionWithTenant> {
@@ -267,7 +294,8 @@ export async function requireTenant(): Promise<SessionWithTenant> {
     email: session.email,
     tenantId: session.tenantId,
     tenantName: session.tenantName,
-    role: session.role
+    role: session.role,
+    driverId: session.driverId ?? null
   }
 }
 

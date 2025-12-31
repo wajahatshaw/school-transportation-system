@@ -42,6 +42,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const pathname = request.nextUrl.pathname
+  const role = (user?.user_metadata as any)?.role
 
   // Public routes that don't require auth
   const publicRoutes = ['/login', '/auth']
@@ -64,6 +65,16 @@ export async function updateSession(request: NextRequest) {
 
   // If user is logged in and accessing dashboard, check if tenant is selected
   if (user && pathname.startsWith('/dashboard')) {
+    // Drivers: only allow Attendance screens inside dashboard
+    if (role === 'driver') {
+      const allowed = pathname === '/dashboard/attendance' || pathname.startsWith('/dashboard/attendance/')
+      if (!allowed) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard/attendance'
+        return NextResponse.redirect(url)
+      }
+    }
+
     const sessionCookie = request.cookies.get('app_session')
     if (!sessionCookie?.value) {
       // No tenant selected, redirect to tenant selection

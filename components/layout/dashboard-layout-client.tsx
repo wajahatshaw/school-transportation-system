@@ -22,9 +22,10 @@ interface DashboardLayoutClientProps {
   tenantName: string
   userEmail: string
   tenantId: string
+  role: string
 }
 
-export function DashboardLayoutClient({ children, tenantName, userEmail, tenantId }: DashboardLayoutClientProps) {
+export function DashboardLayoutClient({ children, tenantName, userEmail, tenantId, role }: DashboardLayoutClientProps) {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   const navItems = [
@@ -39,6 +40,11 @@ export function DashboardLayoutClient({ children, tenantName, userEmail, tenantI
     { href: '/dashboard/audit-logs', label: 'Audit Logs', icon: ScrollText },
     { href: '/dashboard/settings', label: 'Settings', icon: SettingsIcon },
   ]
+
+  const visibleNavItems =
+    role === 'driver'
+      ? [{ href: '/dashboard/attendance', label: 'Attendance', icon: ClipboardCheck }]
+      : navItems
 
   return (
     <>
@@ -56,7 +62,7 @@ export function DashboardLayoutClient({ children, tenantName, userEmail, tenantI
             isCollapsed={isSidebarCollapsed}
             onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           >
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon
               return (
                 <NavLink key={item.href} href={item.href}>

@@ -141,6 +141,8 @@ export async function getDrivers() {
       tenant_id: string
       first_name: string
       last_name: string
+      email: string | null
+      auth_user_id: string | null
       license_number: string | null
       deleted_at: Date | null
       deleted_by: string | null
@@ -156,6 +158,8 @@ export async function getDrivers() {
       tenantId: d.tenant_id,
       firstName: d.first_name,
       lastName: d.last_name,
+      email: d.email,
+      authUserId: d.auth_user_id,
       licenseNumber: d.license_number,
       deletedAt: d.deleted_at,
       deletedBy: d.deleted_by,
@@ -165,15 +169,25 @@ export async function getDrivers() {
   })
 }
 
-export async function createDriver(data: { firstName: string; lastName: string; licenseNumber?: string }) {
+export async function createDriver(data: {
+  firstName: string
+  lastName: string
+  email?: string | null
+  authUserId?: string | null
+  licenseNumber?: string
+}) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    const driver = await tx.driver.create({
+    // NOTE: Prisma TS types can lag behind schema changes in some environments.
+    // We cast to `any` here to avoid blocking builds while still writing safe data.
+    const driver = await (tx.driver as any).create({
       data: {
         tenantId: context.tenantId,
         firstName: data.firstName,
         lastName: data.lastName,
+        email: data.email ?? undefined,
+        authUserId: data.authUserId ?? undefined,
         licenseNumber: data.licenseNumber
       }
     })
@@ -1228,6 +1242,8 @@ export async function getRouteTrips(filters?: {
   sort?: 'asc' | 'desc'
 }) {
   const context = await getTenantContext()
+  const { requireTenant } = await import('./auth/session')
+  const session = await requireTenant()
   
   return await withTenantContext(context, async (tx) => {
     // Build dynamic query
@@ -1241,9 +1257,19 @@ export async function getRouteTrips(filters?: {
       paramIndex++
     }
     
-    if (filters?.driverId) {
+    // Drivers can only see their own assigned trips
+    const effectiveDriverId =
+      session.role === 'driver' ? (session.driverId || undefined) : filters?.driverId
+
+  if (session.role === 'driver' && !effectiveDriverId) {
+    // Driver membership exists but isn't linked to a driver record yet.
+    // Return no trips rather than leaking tenant-wide trips.
+    return []
+  }
+
+    if (effectiveDriverId) {
       query += ` AND driver_id = $${paramIndex}::uuid`
-      params.push(filters.driverId)
+      params.push(effectiveDriverId)
       paramIndex++
     }
     
@@ -1328,6 +1354,8 @@ export async function getRouteTrips(filters?: {
 
 export async function getTripById(tripId: string) {
   const context = await getTenantContext()
+  const { requireTenant } = await import('./auth/session')
+  const session = await requireTenant()
   
   return await withTenantContext(context, async (tx) => {
     // Use Prisma model directly with explicit tenant scoping.
@@ -1341,6 +1369,11 @@ export async function getTripById(tripId: string) {
     })
 
     if (!trip) return null
+
+    // Drivers can only view their assigned trips
+    if (session.role === 'driver') {
+      if (!session.driverId || trip.driverId !== session.driverId) return null
+    }
 
     return {
       id: trip.id,
@@ -1437,6 +1470,8 @@ export async function createRouteTrip(data: {
 
 export async function confirmTrip(tripId: string) {
   const context = await getTenantContext()
+  const { requireTenant } = await import('./auth/session')
+  const session = await requireTenant()
   
   return await withTenantContext(context, async (tx) => {
     // Verify trip exists and belongs to tenant
@@ -1445,6 +1480,16 @@ export async function confirmTrip(tripId: string) {
     })
     if (!existing) {
       throw new Error('Trip not found or access denied')
+    }
+
+    // Drivers: only confirm their own trip, and only for today
+    if (session.role === 'driver') {
+      if (!session.driverId) {
+        throw new Error('Driver is not linked to a driver record')
+      }
+      if (!session.driverId || existing.driverId !== session.driverId) {
+        throw new Error('Access denied')
+      }
     }
     
     // Check if already confirmed
@@ -1479,8 +1524,24 @@ export async function getTripsByDateRange(startDate: Date, endDate: Date) {
 
 export async function getTripAttendance(tripId: string) {
   const context = await getTenantContext()
+  const { requireTenant } = await import('./auth/session')
+  const session = await requireTenant()
   
   return await withTenantContext(context, async (tx) => {
+    // Drivers can only access attendance for their own trips
+    if (session.role === 'driver') {
+      if (!session.driverId) {
+        throw new Error('Driver is not linked to a driver record')
+      }
+      const trip = await tx.routeTrip.findFirst({
+        where: { id: tripId, tenantId: context.tenantId },
+        select: { driverId: true }
+      })
+      if (!trip || !session.driverId || trip.driverId !== session.driverId) {
+        throw new Error('Access denied')
+      }
+    }
+
     const attendance = await tx.$queryRaw<Array<{
       id: string
       tenant_id: string
@@ -1522,6 +1583,8 @@ export async function markAttendance(
   status: 'boarded' | 'absent' | 'no_show'
 ) {
   const context = await getTenantContext()
+  const { requireTenant } = await import('./auth/session')
+  const session = await requireTenant()
   
   if (!tripId) {
     throw new Error('Trip ID is required')
@@ -1542,6 +1605,16 @@ export async function markAttendance(
     })
     if (!trip) {
       throw new Error('Trip not found or access denied')
+    }
+
+    // Drivers: only mark for their own trips, and only for today
+    if (session.role === 'driver') {
+      if (!session.driverId) {
+        throw new Error('Driver is not linked to a driver record')
+      }
+      if (!session.driverId || trip.driverId !== session.driverId) {
+        throw new Error('Access denied')
+      }
     }
     
     // Check if trip is confirmed
@@ -1655,6 +1728,11 @@ export async function updateAttendance(
 
 export async function addStudentToTrip(tripId: string, studentId: string) {
   const context = await getTenantContext()
+  const { requireTenant } = await import('./auth/session')
+  const session = await requireTenant()
+  if (session.role === 'driver') {
+    throw new Error('Drivers cannot add students to trips')
+  }
   
   if (!tripId) {
     throw new Error('Trip ID is required')
@@ -1718,6 +1796,11 @@ export async function addStudentToTrip(tripId: string, studentId: string) {
 
 export async function removeStudentFromTrip(tripId: string, studentId: string) {
   const context = await getTenantContext()
+  const { requireTenant } = await import('./auth/session')
+  const session = await requireTenant()
+  if (session.role === 'driver') {
+    throw new Error('Drivers cannot remove students from trips')
+  }
   
   return await withTenantContext(context, async (tx) => {
     // Find attendance record

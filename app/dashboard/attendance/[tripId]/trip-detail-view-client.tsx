@@ -13,9 +13,10 @@ import { Input } from '@/components/ui/input'
 
 interface TripDetailViewClientProps {
   tripId: string
+  role: string
 }
 
-export function TripDetailViewClient({ tripId }: TripDetailViewClientProps) {
+export function TripDetailViewClient({ tripId, role }: TripDetailViewClientProps) {
   const router = useRouter()
   const params = useParams()
   const effectiveTripId =
@@ -33,6 +34,7 @@ export function TripDetailViewClient({ tripId }: TripDetailViewClientProps) {
   const [selectedStudent, setSelectedStudent] = useState<string>('')
   const [studentQuery, setStudentQuery] = useState('')
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false)
+  const isDriver = role === 'driver'
 
   // Derived data (must be declared BEFORE any early returns to keep hook order stable)
   const attendanceStudentIdSet = useMemo(() => {
@@ -64,7 +66,7 @@ export function TripDetailViewClient({ tripId }: TripDetailViewClientProps) {
       const [tripData, attendanceData, logsData] = await Promise.all([
         getTripById(effectiveTripId),
         getTripAttendance(effectiveTripId),
-        getAuditLogs({ tableName: 'route_trips' })
+        isDriver ? Promise.resolve([]) : getAuditLogs({ tableName: 'route_trips' })
       ])
       
       if (!tripData) {
@@ -76,17 +78,21 @@ export function TripDetailViewClient({ tripId }: TripDetailViewClientProps) {
       setTrip(tripData)
       setAttendance(attendanceData)
       // Filter audit logs for this trip
-      setAuditLogs(logsData.filter(log => log.recordId === effectiveTripId))
+      setAuditLogs((logsData as any[]).filter(log => log.recordId === effectiveTripId))
 
-      // Load students for add-to-trip dropdown
-      const studentsData = await getStudents()
-      setAllStudents(studentsData)
+      // Load students for add-to-trip dropdown (admin only)
+      if (!isDriver) {
+        const studentsData = await getStudents()
+        setAllStudents(studentsData)
+      } else {
+        setAllStudents([])
+      }
     } catch (error) {
       toast.error('Failed to load trip details')
     } finally {
       setLoading(false)
     }
-  }, [effectiveTripId, router])
+  }, [effectiveTripId, router, isDriver])
 
   useEffect(() => {
     loadData()
@@ -136,6 +142,8 @@ export function TripDetailViewClient({ tripId }: TripDetailViewClientProps) {
   }
 
   // (moved above to keep hook order stable + optimize)
+
+  const isReadOnlyForDriver = isDriver && !!trip.confirmedAt
 
   const handleAddStudent = async () => {
     if (!selectedStudent) {
@@ -260,8 +268,8 @@ export function TripDetailViewClient({ tripId }: TripDetailViewClientProps) {
         </div>
       </div>
 
-      {/* Add Student (only before confirmation) */}
-      {!trip.confirmedAt && (
+      {/* Add/Remove Student (admin only, only before confirmation) */}
+      {!isDriver && !trip.confirmedAt && (
         <div className="bg-white border border-slate-200 rounded-lg p-5">
           {!showAddStudent ? (
             <Button
@@ -403,6 +411,12 @@ export function TripDetailViewClient({ tripId }: TripDetailViewClientProps) {
           </h2>
         </div>
 
+        {isReadOnlyForDriver && (
+          <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            This trip is confirmed and locked. Attendance cannot be updated.
+          </div>
+        )}
+
         {attendance.length === 0 ? (
           <div className="text-center py-12 text-slate-500">
             No students on this trip yet. Add students to begin marking attendance.
@@ -419,10 +433,11 @@ export function TripDetailViewClient({ tripId }: TripDetailViewClientProps) {
                     student={record.student}
                     currentStatus={record.status}
                     isConfirmed={!!trip.confirmedAt}
+                    isReadOnly={isReadOnlyForDriver}
                     onStatusChange={({ studentId, status, markedAt }) => upsertAttendance(studentId, status, markedAt)}
                   />
 
-                  {!trip.confirmedAt && (
+                  {!isDriver && !trip.confirmedAt && (
                     <Button
                       onClick={() =>
                         handleRemoveStudent(
@@ -456,7 +471,7 @@ export function TripDetailViewClient({ tripId }: TripDetailViewClientProps) {
       />
 
       {/* Audit Log */}
-      {auditLogs.length > 0 && (
+      {!isDriver && auditLogs.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-slate-900">

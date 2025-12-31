@@ -21,7 +21,7 @@ export default async function TripDetailPage({
 
   return (
     <Suspense fallback={<LoadingSkeleton />}>
-      <TripDetailViewClient tripId={params.tripId} />
+      <TripDetailViewClient tripId={params.tripId} role={session.role || 'user'} />
     </Suspense>
   )
 }

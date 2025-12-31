@@ -29,10 +29,12 @@ model Membership {
   userId     String   @map("user_id") @db.Uuid
   tenantId   String   @map("tenant_id") @db.Uuid
   role       String
+  driverId   String?  @unique @map("driver_id") @db.Uuid
   createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
 
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
   user       User     @relation(fields: [userId], references: [id])
+  driver     Driver?  @relation("DriverMembership", fields: [driverId], references: [id])
 
   @@unique([userId, tenantId])
   @@map("memberships")
@@ -62,6 +64,8 @@ model Driver {
   tenantId  String   @map("tenant_id") @db.Uuid
   firstName String   @map("first_name")
   lastName  String   @map("last_name")
+  email     String?  @map("email")
+  authUserId String? @map("auth_user_id") @db.Uuid
   licenseNumber String? @map("license_number")
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
   deletedBy String? @map("deleted_by") @db.Uuid
@@ -72,8 +76,11 @@ model Driver {
   compliances DriverComplianceDocument[]
   routes      Route[]
   trips       RouteTrip[]
+  membership  Membership?                  @relation("DriverMembership")
 
   @@map("drivers")
+  @@index([tenantId, email])
+  @@index([authUserId])
 }
 
 model DriverComplianceDocument {

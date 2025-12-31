@@ -18,9 +18,9 @@ export async function loginAction(email: string, password: string) {
   if (error) {
     return { error: error.message }
   }
-  
+
   // Return success - client will handle redirect
-  return { success: true }
+  return { success: true, redirectTo: '/select-tenant' }
 }
 
 /**

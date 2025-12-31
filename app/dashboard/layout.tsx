@@ -28,6 +28,7 @@ export default async function DashboardLayout({
         tenantName={tenant?.name || 'School Transportation Management'}
         userEmail={session.email}
         tenantId={session.tenantId}
+        role={session.role || 'user'}
       >
         {children}
       </DashboardLayoutClient>

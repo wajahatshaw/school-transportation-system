@@ -48,8 +48,8 @@ export default function LoginPage() {
           setError(result.error)
           setLoading(false)
         } else if (result?.success) {
-          // Success - redirect to tenant selection
-          router.push('/select-tenant')
+          // Success - redirect based on role (admin/staff vs driver)
+          router.push(result.redirectTo || '/select-tenant')
           router.refresh()
           // Don't set loading to false here - let the redirect happen
         }
