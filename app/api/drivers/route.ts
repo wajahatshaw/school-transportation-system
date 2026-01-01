@@ -97,6 +97,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Prevent duplicate active driver records in this tenant BEFORE creating auth user / sending invite.
+    // (Drivers are soft-deleted, so we only block duplicates where deletedAt is null.)
+    const existingDriver = await prisma.driver.findFirst({
+      where: {
+        tenantId: session.tenantId,
+        email: emailStr,
+        deletedAt: null,
+      },
+      select: { id: true },
+    })
+    if (existingDriver) {
+      return NextResponse.json(
+        { error: 'A driver with this email already exists.' },
+        { status: 409 }
+      )
+    }
+
     // Always send invite links to a dedicated page that can consume the invite token
     // and let the driver set their first password.
     const redirectTo = `${request.nextUrl.origin}/auth/invite`
