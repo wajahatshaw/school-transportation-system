@@ -16,6 +16,8 @@ model Tenant {
   drivers                     Driver[]
   compliances                 DriverComplianceDocument[]
   auditLogs                   AuditLog[]
+  vehicles                    Vehicle[]
+  routes                      Route[]
 
   @@map("tenants")
 }
@@ -40,12 +42,14 @@ model Student {
   firstName  String   @map("first_name")
   lastName   String   @map("last_name")
   grade      String?
+  routeId    String?  @map("route_id") @db.Uuid
   deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
   deletedBy  String? @map("deleted_by") @db.Uuid
   createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
 
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  route      Route?   @relation(fields: [routeId], references: [id])
 
   @@map("students")
 }
@@ -63,6 +67,7 @@ model Driver {
 
   tenant    Tenant                       @relation(fields: [tenantId], references: [id])
   compliances DriverComplianceDocument[]
+  routes    Route[]
 
   @@map("drivers")
 }
@@ -112,4 +117,43 @@ model User {
   memberships Membership[]
 
   @@map("users")
+}
+
+model Vehicle {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String
+  capacity      Int
+  licensePlate  String?   @map("license_plate")
+  vehicleType   String?   @map("vehicle_type")
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy     String?   @map("deleted_by") @db.Uuid
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  routes        Route[]
+
+  @@map("vehicles")
+}
+
+model Route {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  name      String
+  type      String
+  vehicleId String?   @map("vehicle_id") @db.Uuid
+  driverId  String?   @map("driver_id") @db.Uuid
+  stops     Json      @default("[]")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy String?   @map("deleted_by") @db.Uuid
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  vehicle   Vehicle?  @relation(fields: [vehicleId], references: [id])
+  driver    Driver?   @relation(fields: [driverId], references: [id])
+  students  Student[]
+
+  @@map("routes")
 }
