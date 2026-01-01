@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { Loader2, User, GraduationCap } from 'lucide-react'
 import { Student } from '@prisma/client'
+import { getRoutes } from '@/lib/actions'
 import {
   Dialog,
   DialogContent,
@@ -16,17 +17,35 @@ import { Button } from '@/components/ui/button'
 interface EditStudentModalProps {
   student: Student
   onClose: () => void
-  onSave: (data: { firstName: string; lastName: string; grade?: string }) => Promise<void>
+  onSave: (data: { firstName: string; lastName: string; grade?: string; routeId?: string | null }) => Promise<void>
 }
 
 export function EditStudentModal({ student, onClose, onSave }: EditStudentModalProps) {
   const [isPending, startTransition] = useTransition()
+  const [routes, setRoutes] = useState<any[]>([])
+  const [routesLoading, setRoutesLoading] = useState(true)
   const [formData, setFormData] = useState({
     firstName: student.firstName,
     lastName: student.lastName,
     grade: student.grade || '',
+    routeId: (student as any).routeId || '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const loadRoutes = async () => {
+      try {
+        setRoutesLoading(true)
+        const routesData = await getRoutes()
+        setRoutes(routesData.filter((r: any) => !r.deletedAt))
+      } catch {
+        // non-blocking
+      } finally {
+        setRoutesLoading(false)
+      }
+    }
+    loadRoutes()
+  }, [])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -52,6 +71,7 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         grade: formData.grade.trim() || undefined,
+        routeId: formData.routeId ? formData.routeId : null,
       })
     })
   }
@@ -139,6 +159,28 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
                 />
               </div>
               <p className="text-xs text-slate-500">Optional: Specify the student's grade level</p>
+            </div>
+
+            {/* Route */}
+            <div className="space-y-2">
+              <Label htmlFor="routeId" className="text-sm font-medium text-slate-700">
+                Route
+              </Label>
+              <select
+                id="routeId"
+                value={formData.routeId}
+                onChange={(e) => handleChange('routeId', e.target.value)}
+                disabled={isPending || routesLoading}
+                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+              >
+                <option value="">Unassigned</option>
+                {routes.map((r: any) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name} ({r.type})
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500">Optional: Assign the student to a route</p>
             </div>
           </div>
 

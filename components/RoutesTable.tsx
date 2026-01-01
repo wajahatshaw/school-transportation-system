@@ -1,15 +1,14 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
-import { updateRoute, deleteRoute, getRouteCapacity } from '@/lib/actions'
+import { updateRoute, deleteRoute } from '@/lib/actions'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { EditRouteModal } from './EditRouteModal'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
-import { RouteCapacityIndicator } from './RouteCapacityIndicator'
 
 // Type definitions to avoid Prisma client import issues
 type Vehicle = {
@@ -67,24 +66,6 @@ export function RoutesTable({ routes, vehicles, drivers, onUpdate }: RoutesTable
   const [editingRoute, setEditingRoute] = useState<RouteWithRelations | null>(null)
   const [deletingRoute, setDeletingRoute] = useState<RouteWithRelations | null>(null)
   const [isPending, startTransition] = useTransition()
-  const [capacities, setCapacities] = useState<Map<string, { assigned: number; capacity: number; available: number; isFull: boolean }>>(new Map())
-
-  // Load capacities for all routes
-  useEffect(() => {
-    const loadCapacities = async () => {
-      const newCapacities = new Map()
-      for (const route of routes) {
-        try {
-          const capacity = await getRouteCapacity(route.id)
-          newCapacities.set(route.id, capacity)
-        } catch (error) {
-          // Skip if error
-        }
-      }
-      setCapacities(newCapacities)
-    }
-    loadCapacities()
-  }, [routes])
 
   const handleEdit = (route: RouteWithRelations) => {
     setEditingRoute(route)
@@ -187,7 +168,6 @@ export function RoutesTable({ routes, vehicles, drivers, onUpdate }: RoutesTable
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
               {routes.map((route) => {
-                const capacity = capacities.get(route.id)
                 return (
                   <tr
                     key={route.id}
@@ -228,13 +208,12 @@ export function RoutesTable({ routes, vehicles, drivers, onUpdate }: RoutesTable
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {capacity && (
-                        <RouteCapacityIndicator
-                          assigned={capacity.assigned}
-                          capacity={capacity.capacity}
-                          available={capacity.available}
-                          isFull={capacity.isFull}
-                        />
+                      {typeof route.vehicle?.capacity === 'number' ? (
+                        <div className="text-sm text-slate-900 font-medium">
+                          {route.vehicle.capacity}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-500">—</div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

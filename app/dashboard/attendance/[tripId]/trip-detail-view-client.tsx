@@ -10,6 +10,7 @@ import { AttendanceMarker } from '@/components/AttendanceMarker'
 import { TripConfirmButton } from '@/components/TripConfirmButton'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
+import { Skeleton } from '@/components/ui/skeleton'
 
 interface TripDetailViewClientProps {
   tripId: string
@@ -29,6 +30,7 @@ export function TripDetailViewClient({ tripId, role }: TripDetailViewClientProps
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true) // initial load only
   const [isMutating, setIsMutating] = useState(false)
+  const [attendanceMutations, setAttendanceMutations] = useState(0)
   const [showAudit, setShowAudit] = useState(false)
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<string>('')
@@ -82,8 +84,8 @@ export function TripDetailViewClient({ tripId, role }: TripDetailViewClientProps
 
       // Load students for add-to-trip dropdown (admin only)
       if (!isDriver) {
-        const studentsData = await getStudents()
-        setAllStudents(studentsData)
+      const studentsData = await getStudents()
+      setAllStudents(studentsData)
       } else {
         setAllStudents([])
       }
@@ -109,7 +111,35 @@ export function TripDetailViewClient({ tripId, role }: TripDetailViewClientProps
   }
 
   if (loading) {
-    return <div className="text-center py-12">Loading...</div>
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-9 w-40" />
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-6 space-y-4">
+          <Skeleton className="h-7 w-64" />
+          <div className="flex gap-4">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white border border-slate-200 rounded-lg p-4">
+              <Skeleton className="h-8 w-10 mb-2" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg p-6 space-y-3">
+          <Skeleton className="h-6 w-40" />
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   if (!trip) {
@@ -327,7 +357,7 @@ export function TripDetailViewClient({ tripId, role }: TripDetailViewClientProps
                       ) : (
                         filteredStudents.slice(0, 50).map((student) => {
                           const label = `${student.firstName} ${student.lastName}`
-                          const sub = student.grade ? `Grade ${student.grade}` : 'No grade'
+                          const sub = student.grade ? formatGradeLabel(student.grade) : 'No grade'
                           const active = selectedStudent === student.id
                           return (
                             <button
@@ -435,6 +465,8 @@ export function TripDetailViewClient({ tripId, role }: TripDetailViewClientProps
                     isConfirmed={!!trip.confirmedAt}
                     isReadOnly={isReadOnlyForDriver}
                     onStatusChange={({ studentId, status, markedAt }) => upsertAttendance(studentId, status, markedAt)}
+                    onMutationStart={() => setAttendanceMutations((c) => c + 1)}
+                    onMutationEnd={() => setAttendanceMutations((c) => Math.max(0, c - 1))}
                   />
 
                   {!isDriver && !trip.confirmedAt && (
@@ -464,6 +496,14 @@ export function TripDetailViewClient({ tripId, role }: TripDetailViewClientProps
         tripId={effectiveTripId}
         isConfirmed={!!trip.confirmedAt}
         stats={stats}
+        disabled={attendanceMutations > 0 || isMutating || stats.boarded === 0}
+        disabledReason={
+          attendanceMutations > 0 || isMutating
+            ? 'Please wait for changes to finish saving.'
+            : stats.boarded === 0
+              ? 'At least 1 student must be boarded to confirm.'
+              : undefined
+        }
         onConfirmed={async () => {
           // Avoid full reload: update local trip state
           setTrip((prev: any) => (prev ? { ...prev, confirmedAt: new Date().toISOString() } : prev))
@@ -507,5 +547,12 @@ export function TripDetailViewClient({ tripId, role }: TripDetailViewClientProps
       )}
     </div>
   )
+}
+
+function formatGradeLabel(grade: string) {
+  const g = grade.trim()
+  if (!g) return ''
+  if (/^grade\b/i.test(g)) return g
+  return `Grade ${g}`
 }
 

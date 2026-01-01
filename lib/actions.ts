@@ -67,7 +67,10 @@ export async function createStudent(data: { firstName: string; lastName: string;
   })
 }
 
-export async function updateStudent(id: string, data: { firstName: string; lastName: string; grade?: string }) {
+export async function updateStudent(
+  id: string,
+  data: { firstName: string; lastName: string; grade?: string; routeId?: string | null }
+) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
@@ -80,17 +83,29 @@ export async function updateStudent(id: string, data: { firstName: string; lastN
       throw new Error('Student not found or access denied')
     }
     
+    // If routeId is provided, validate route belongs to tenant (or allow null to unassign)
+    if (data.routeId !== undefined && data.routeId !== null) {
+      const route = await tx.route.findFirst({
+        where: { id: data.routeId, tenantId: context.tenantId, deletedAt: null }
+      })
+      if (!route) {
+        throw new Error('Route not found or access denied')
+      }
+    }
+
     const student = await tx.student.update({
       where: { id },
       data: {
         firstName: data.firstName,
         lastName: data.lastName,
-        grade: data.grade
+        grade: data.grade,
+        ...(data.routeId === undefined ? {} : { routeId: data.routeId })
       }
     })
     
     // Revalidate both the students page and dashboard
     revalidatePath('/dashboard/students')
+    revalidatePath('/dashboard/routes')
     revalidatePath('/dashboard')
     revalidatePath('/dashboard/audit-logs')
     
@@ -1160,10 +1175,26 @@ export async function getRouteCapacity(routeId: string) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
-    // Get route with vehicle
-    const route = await getRouteById(routeId)
-    if (!route) {
-      throw new Error('Route not found')
+    // IMPORTANT: avoid nested transactions by not calling getRouteById() here.
+    // Fetch route + vehicle capacity within the same tenant context.
+    const routeRows = await tx.$queryRaw<Array<{ id: string; vehicle_id: string | null }>>`
+      SELECT id, vehicle_id
+      FROM app.v_routes
+      WHERE id = ${routeId}::uuid
+      LIMIT 1
+    `
+    const routeRow = routeRows[0]
+    if (!routeRow) throw new Error('Route not found')
+
+    let capacity = 0
+    if (routeRow.vehicle_id) {
+      const vehicleRows = await tx.$queryRaw<Array<{ capacity: number }>>`
+        SELECT capacity
+        FROM app.v_vehicles
+        WHERE id = ${routeRow.vehicle_id}::uuid
+        LIMIT 1
+      `
+      capacity = Number(vehicleRows[0]?.capacity || 0)
     }
     
     // Count students assigned to route
@@ -1174,7 +1205,6 @@ export async function getRouteCapacity(routeId: string) {
     `
     
     const assigned = Number(studentCount[0]?.count || 0)
-    const capacity = route.vehicle?.capacity || 0
     const available = Math.max(0, capacity - assigned)
     const isFull = capacity > 0 && assigned >= capacity
     
@@ -1184,6 +1214,57 @@ export async function getRouteCapacity(routeId: string) {
       available,
       isFull
     }
+  })
+}
+
+export async function getRouteCapacities(routeIds: string[]) {
+  const context = await getTenantContext()
+
+  if (!Array.isArray(routeIds) || routeIds.length === 0) {
+    return {}
+  }
+
+  return await withTenantContext(context, async (tx) => {
+    // 1) Routes → vehicle ids
+    const routes = await tx.$queryRaw<Array<{ id: string; vehicle_id: string | null }>>`
+      SELECT id, vehicle_id
+      FROM app.v_routes
+      WHERE id = ANY(${routeIds}::uuid[])
+    `
+
+    const vehicleIds = Array.from(
+      new Set(routes.map((r) => r.vehicle_id).filter((id): id is string => !!id))
+    )
+
+    // 2) Vehicle capacities
+    const vehicles = vehicleIds.length
+      ? await tx.$queryRaw<Array<{ id: string; capacity: number }>>`
+          SELECT id, capacity
+          FROM app.v_vehicles
+          WHERE id = ANY(${vehicleIds}::uuid[])
+        `
+      : []
+    const vehicleCapMap = new Map(vehicles.map((v) => [v.id, Number(v.capacity || 0)]))
+
+    // 3) Student counts grouped by route_id
+    const counts = await tx.$queryRaw<Array<{ route_id: string; count: bigint }>>`
+      SELECT route_id, COUNT(*) as count
+      FROM app.v_students
+      WHERE route_id = ANY(${routeIds}::uuid[])
+      GROUP BY route_id
+    `
+    const countMap = new Map(counts.map((c) => [c.route_id, Number(c.count || 0)]))
+
+    // 4) Build response map
+    const out: Record<string, { assigned: number; capacity: number; available: number; isFull: boolean }> = {}
+    for (const r of routes) {
+      const assigned = countMap.get(r.id) ?? 0
+      const capacity = r.vehicle_id ? (vehicleCapMap.get(r.vehicle_id) ?? 0) : 0
+      const available = Math.max(0, capacity - assigned)
+      const isFull = capacity > 0 && assigned >= capacity
+      out[r.id] = { assigned, capacity, available, isFull }
+    }
+    return out
   })
 }
 
@@ -1233,8 +1314,8 @@ export async function getRoutesByType(type: 'AM' | 'PM') {
 export async function getRouteTrips(filters?: {
   routeId?: string
   driverId?: string
-  startDate?: Date
-  endDate?: Date
+  startDate?: Date | string
+  endDate?: Date | string
   routeType?: 'AM' | 'PM'
   includeConfirmed?: boolean
   limit?: number

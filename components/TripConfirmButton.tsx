@@ -16,6 +16,8 @@ interface TripConfirmButtonProps {
     noShow: number
     total: number
   }
+  disabled?: boolean
+  disabledReason?: string
   onConfirmed?: () => void
 }
 
@@ -23,6 +25,8 @@ export function TripConfirmButton({
   tripId,
   isConfirmed,
   stats,
+  disabled = false,
+  disabledReason,
   onConfirmed
 }: TripConfirmButtonProps) {
   const [showDialog, setShowDialog] = useState(false)
@@ -66,59 +70,70 @@ export function TripConfirmButton({
   }
 
   const hasUnaccounted = stats.total > (stats.boarded + stats.absent + stats.noShow)
+  const isDisabled = disabled || isPending
+  const showNoBoarded = stats.boarded === 0
 
   return (
     <>
       <div className="bg-white border border-slate-200 rounded-lg p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">
-              Ready to confirm trip?
-            </h3>
-            
-            <div className="grid grid-cols-4 gap-4 mb-4">
-              <div className="text-center p-3 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{stats.boarded}</div>
-                <div className="text-xs text-green-700">Boarded</div>
-              </div>
-              <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600">{stats.absent}</div>
-                <div className="text-xs text-yellow-700">Absent</div>
-              </div>
-              <div className="text-center p-3 bg-red-50 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">{stats.noShow}</div>
-                <div className="text-xs text-red-700">No Show</div>
-              </div>
-              <div className="text-center p-3 bg-slate-50 rounded-lg">
-                <div className="text-2xl font-bold text-slate-600">{stats.total}</div>
-                <div className="text-xs text-slate-700">Total</div>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Confirm trip</h3>
+                <p className="text-sm text-slate-600">
+                  Once confirmed, this trip is locked and cannot be modified.
+                </p>
               </div>
             </div>
 
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-700">{stats.boarded}</div>
+                <div className="text-xs text-green-800">Boarded</div>
+              </div>
+              <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-700">{stats.absent}</div>
+                <div className="text-xs text-yellow-800">Absent</div>
+              </div>
+              <div className="text-center p-3 bg-red-50 rounded-lg">
+                <div className="text-2xl font-bold text-red-700">{stats.noShow}</div>
+                <div className="text-xs text-red-800">No Show</div>
+              </div>
+              <div className="text-center p-3 bg-slate-50 rounded-lg">
+                <div className="text-2xl font-bold text-slate-700">{stats.total}</div>
+                <div className="text-xs text-slate-700">Total</div>
+              </div>
+        </div>
+
             {hasUnaccounted && (
-              <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg mb-4">
+              <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
                 <AlertTriangle className="h-4 w-4 text-orange-600 flex-shrink-0" />
                 <div className="text-sm text-orange-800">
-                  <strong>{stats.total - (stats.boarded + stats.absent + stats.noShow)} student(s)</strong> have not been accounted for.
-                  You can still confirm, but make sure this is correct.
+                  <strong>{stats.total - (stats.boarded + stats.absent + stats.noShow)} student(s)</strong> have not been accounted for yet.
                 </div>
               </div>
             )}
-            
-            <p className="text-sm text-slate-600 mb-4">
-              Once confirmed, this trip cannot be modified. All attendance records will be locked.
-            </p>
+
+            {(showNoBoarded || disabledReason) && (
+              <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700">
+                <Lock className="h-4 w-4 text-slate-600 flex-shrink-0" />
+                <div>
+                  {disabledReason || (showNoBoarded ? 'At least 1 student must be boarded to confirm.' : '')}
+                </div>
           </div>
-          
+        )}
+
+        <div className="flex justify-end">
           <Button
             onClick={() => setShowDialog(true)}
-            disabled={isPending}
+            disabled={isDisabled}
             size="lg"
-            className="bg-blue-600 hover:bg-blue-700"
+            className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800"
           >
             <Lock className="h-4 w-4 mr-2" />
             Confirm Trip
           </Button>
+        </div>
         </div>
       </div>
 
@@ -177,8 +192,8 @@ export function TripConfirmButton({
               <Button
                 type="button"
                 onClick={handleConfirm}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-                disabled={isPending}
+                className="flex-1 bg-slate-900 hover:bg-slate-800"
+                disabled={isDisabled}
               >
                 {isPending ? 'Confirming...' : 'Yes, Confirm Trip'}
               </Button>

@@ -28,9 +28,11 @@ function createPrismaClient() {
   // Supabase session pooler typically allows 4-10 connections per pooler
   // We use a reasonable size to handle concurrent requests without exhausting limits
   if (!globalForPool.pool) {
+    const desiredMax = Number(process.env.PRISMA_POOL_MAX || 4)
+    const max = Number.isFinite(desiredMax) ? Math.min(Math.max(desiredMax, 1), 10) : 4
     globalForPool.pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max: 4, // Allow concurrent transactions (Supabase session pooler limit is typically higher)
+      max, // Allow concurrent transactions (cap to avoid exhausting Supabase poolers)
       min: 0, // Allow pool to close idle connections
       idleTimeoutMillis: 30000, // Close idle connections after 30s
       connectionTimeoutMillis: 10000, // Wait up to 10s for a connection

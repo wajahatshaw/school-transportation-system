@@ -43,6 +43,10 @@ export async function withTenantContext<T>(
     throw new Error('Invalid IP address format')
   }
   
+  // Interactive transactions need a free connection from the pool.
+  // Under parallel page loads we can briefly exhaust the pool and hit:
+  // "Unable to start a transaction in the given time."
+  // Increase maxWait/timeout to be more resilient.
   return await prisma.$transaction(async (tx) => {
     // Set Postgres session variables for RLS enforcement
     // These must be set BEFORE any queries in the transaction
@@ -85,8 +89,13 @@ export async function withTenantContext<T>(
     
     // Execute the callback with the transaction client
     // All queries here will be automatically scoped by RLS
-    return await callback(tx)
-  })
+      return await callback(tx)
+    },
+    {
+      maxWait: Number(process.env.PRISMA_TX_MAX_WAIT_MS || 10000),
+      timeout: Number(process.env.PRISMA_TX_TIMEOUT_MS || 20000),
+    }
+  )
 }
 
 /**

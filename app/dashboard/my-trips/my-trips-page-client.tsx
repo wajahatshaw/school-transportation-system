@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ClipboardPlus } from 'lucide-react'
 import { getRouteTrips, getRoutes, getDrivers, createRouteTrip } from '@/lib/actions'
@@ -12,15 +12,28 @@ import { AttendanceHistoryTable } from '@/components/AttendanceHistoryTable'
 
 type RouteType = 'AM' | 'PM'
 
+type TripsCacheEntry = {
+  activeTrips: any[]
+  pastTrips: any[]
+  loaded: boolean
+}
+
 export function MyTripsPageClient() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<RouteType>('AM')
-  const [trips, setTrips] = useState<any[]>([])
+  const [activeTrips, setActiveTrips] = useState<any[]>([])
+  const [pastTrips, setPastTrips] = useState<any[]>([])
   const [routes, setRoutes] = useState<any[]>([]) // all routes (non-deleted)
+  const [routesLoading, setRoutesLoading] = useState(true)
   const [drivers, setDrivers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
+  const loadSeq = useRef(0)
+  const tripsCacheRef = useRef<Record<RouteType, TripsCacheEntry>>({
+    AM: { activeTrips: [], pastTrips: [], loaded: false },
+    PM: { activeTrips: [], pastTrips: [], loaded: false }
+  })
   const [createForm, setCreateForm] = useState({
     routeId: '',
     tripDate: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
@@ -29,31 +42,91 @@ export function MyTripsPageClient() {
   })
 
   useEffect(() => {
-    loadData()
+    // Switching tabs should NOT refetch every time.
+    // If we've already loaded this tab once, use cached data instantly.
+    const cached = tripsCacheRef.current[activeTab]
+    if (cached?.loaded) {
+      setActiveTrips(cached.activeTrips)
+      setPastTrips(cached.pastTrips)
+      setLoading(false)
+      return
+    }
+    // First time loading this tab: fetch with loader.
+    loadData({ tab: activeTab, force: true, showLoader: true })
   }, [activeTab])
 
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
+  // Load routes once (for Create Trip modal) to avoid slow dropdown on open
+  useEffect(() => {
+    const loadRoutes = async () => {
+      try {
+        setRoutesLoading(true)
+        const routesData = await getRoutes()
+        setRoutes(routesData.filter(r => !r.deletedAt))
+      } catch {
+        // non-blocking
+      } finally {
+        setRoutesLoading(false)
+      }
+    }
+    loadRoutes()
+  }, [])
 
-      const [tripsDataRaw, routesData] = await Promise.all([
+  const loadData = async (opts?: { tab?: RouteType; force?: boolean; showLoader?: boolean }) => {
+    const tab = opts?.tab ?? activeTab
+    const force = !!opts?.force
+    const showLoader = opts?.showLoader ?? true
+    const cached = tripsCacheRef.current[tab]
+    if (!force && cached?.loaded) {
+      setActiveTrips(cached.activeTrips)
+      setPastTrips(cached.pastTrips)
+      setLoading(false)
+      return
+    }
+
+    const seq = ++loadSeq.current
+    try {
+      if (showLoader) {
+        setLoading(true)
+        // Clear existing data so we don't flash stale trips while loading
+        setActiveTrips([])
+        setPastTrips([])
+      }
+      const todayStr = toLocalYyyyMmDd(new Date())
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayStr = toLocalYyyyMmDd(yesterday)
+
+      const [activeTripsRaw, pastTripsRaw] = await Promise.all([
         getRouteTrips({
-          startDate: today, // active + upcoming only (no past)
-          routeType: activeTab,
+          startDate: todayStr, // active + upcoming only (no past) - local date string
+          routeType: tab,
           includeConfirmed: true,
           sort: 'asc',
         }),
-        getRoutes()
+        getRouteTrips({
+          endDate: yesterdayStr, // past only - local date string
+          routeType: tab,
+          includeConfirmed: true,
+          sort: 'desc',
+          limit: 50
+        })
       ])
 
-      setTrips(tripsDataRaw)
-      setRoutes(routesData.filter(r => !r.deletedAt))
+      // Ignore out-of-order responses (tab switching fast)
+      if (seq !== loadSeq.current) return
+
+      tripsCacheRef.current[tab] = {
+        activeTrips: activeTripsRaw,
+        pastTrips: pastTripsRaw,
+        loaded: true
+      }
+
+      setActiveTrips(activeTripsRaw)
+      setPastTrips(pastTripsRaw)
     } catch (error) {
       toast.error('Failed to load trips')
     } finally {
-      setLoading(false)
+      if (seq === loadSeq.current) setLoading(false)
     }
   }
 
@@ -102,8 +175,8 @@ export function MyTripsPageClient() {
 
       toast.success('Trip created')
       setCreateOpen(false)
-      // Do not auto-navigate; refresh list so it appears in Attendance/My Trips
-      await loadData()
+      // Do not auto-navigate; refresh only the current tab cache (no loader flash)
+      await loadData({ tab: activeTab, force: true, showLoader: false })
     } catch (error) {
       toast.error('Failed to create trip', {
         description: error instanceof Error ? error.message : 'Please try again'
@@ -120,6 +193,10 @@ export function MyTripsPageClient() {
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+
+  const routesForType = useMemo(() => {
+    return routes.filter((r) => r.type === createForm.routeType)
+  }, [routes, createForm.routeType])
 
   return (
     <div className="space-y-6">
@@ -163,7 +240,7 @@ export function MyTripsPageClient() {
       <div>
         <h2 className="text-xl font-semibold text-slate-900 mb-4">Active & Upcoming Trips</h2>
 
-        {trips.length === 0 && !loading ? (
+        {activeTrips.length === 0 && !loading ? (
         <EmptyState
           icon={<div className="text-6xl">🚌</div>}
           title="No active or upcoming trips"
@@ -171,8 +248,20 @@ export function MyTripsPageClient() {
         />
         ) : (
           <>
-            <AttendanceHistoryTable trips={trips} loading={loading} onTripClick={handleOpenTrip} />
+            <AttendanceHistoryTable trips={activeTrips} loading={loading} onTripClick={handleOpenTrip} />
           </>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-xl font-semibold text-slate-900 mb-4">Past Trips</h2>
+
+        {pastTrips.length === 0 && !loading ? (
+          <div className="text-sm text-slate-600">
+            No past trips found for {activeTab}.
+          </div>
+        ) : (
+          <AttendanceHistoryTable trips={pastTrips} loading={loading} onTripClick={handleOpenTrip} />
         )}
       </div>
 
@@ -194,7 +283,7 @@ export function MyTripsPageClient() {
                   onChange={(e) =>
                     setCreateForm((p) => ({ ...p, routeType: e.target.value as RouteType, routeId: '' }))
                   }
-                  className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
                   disabled={creating}
                 >
                   <option value="AM">AM</option>
@@ -219,17 +308,17 @@ export function MyTripsPageClient() {
               <select
                 value={createForm.routeId}
                 onChange={(e) => setCreateForm((p) => ({ ...p, routeId: e.target.value }))}
-                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
-                disabled={creating}
+                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
+                disabled={creating || routesLoading}
               >
-                <option value="">Select a route...</option>
-                {routes
-                  .filter((r) => r.type === createForm.routeType)
-                  .map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
+                <option value="">
+                  {routesLoading ? 'Loading routes…' : 'Select a route…'}
+                </option>
+                {routesForType.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
               </select>
               <p className="text-xs text-slate-500">
                 Only routes matching the selected trip type are shown.
@@ -241,7 +330,7 @@ export function MyTripsPageClient() {
               <select
                 value={createForm.driverId}
                 onChange={(e) => setCreateForm((p) => ({ ...p, driverId: e.target.value }))}
-                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
                 disabled={creating}
               >
                 <option value="">Use route default / Unassigned</option>
@@ -277,5 +366,12 @@ export function MyTripsPageClient() {
       </Dialog>
     </div>
   )
+}
+
+function toLocalYyyyMmDd(date: Date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
 }
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { loginAction, signupAction } from '@/lib/auth/actions'
+import { loginAction } from '@/lib/auth/actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -10,10 +10,8 @@ export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isSignup, setIsSignup] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState('')
 
   // Helper to check if error is a Next.js redirect (should be ignored)
   function isRedirectError(error: unknown): boolean {
@@ -27,32 +25,17 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    setSuccess('')
     setLoading(true)
 
     try {
-      if (isSignup) {
-        const result = await signupAction(email, password)
-        if (result?.error) {
-          setError(result.error)
-          setLoading(false)
-        } else {
-          setSuccess('Account created! Please check your email to verify your account, then log in.')
-          setIsSignup(false)
-          setPassword('')
-          setLoading(false)
-        }
-      } else {
-        const result = await loginAction(email, password)
-        if (result?.error) {
-          setError(result.error)
-          setLoading(false)
-        } else if (result?.success) {
-          // Success - redirect based on role (admin/staff vs driver)
-          router.push(result.redirectTo || '/select-tenant')
-          router.refresh()
-          // Don't set loading to false here - let the redirect happen
-        }
+      const result = await loginAction(email, password)
+      if (result?.error) {
+        setError(result.error)
+        setLoading(false)
+      } else if (result?.success) {
+        router.push(result.redirectTo || '/select-tenant')
+        router.refresh()
+        // Don't set loading to false here - let the redirect happen
       }
     } catch (err) {
       // Ignore Next.js redirect errors (they're expected behavior)
@@ -70,7 +53,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {isSignup ? 'Create your account' : 'Sign in to your account'}
+            Sign in to your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             School Transportation Management System
@@ -103,7 +86,7 @@ export default function LoginPage() {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete={isSignup ? 'new-password' : 'current-password'}
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -123,39 +106,14 @@ export default function LoginPage() {
             </div>
           )}
 
-          {success && (
-            <div className="rounded-md bg-green-50 p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-green-800">{success}</h3>
-                </div>
-              </div>
-            </div>
-          )}
-
           <div>
             <Button
               type="submit"
               className="w-full"
               disabled={loading}
             >
-              {loading ? 'Please wait...' : (isSignup ? 'Sign up' : 'Sign in')}
+              {loading ? 'Please wait...' : 'Sign in'}
             </Button>
-          </div>
-
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignup(!isSignup)
-                setError('')
-                setSuccess('')
-              }}
-              className="text-sm text-blue-600 hover:text-blue-500"
-              disabled={loading}
-            >
-              {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-            </button>
           </div>
         </form>
       </div>

@@ -23,6 +23,8 @@ interface AttendanceMarkerProps {
   isConfirmed: boolean
   isReadOnly?: boolean
   onStatusChange?: (updated: { studentId: string; status: 'boarded' | 'absent' | 'no_show'; markedAt?: string | Date }) => void
+  onMutationStart?: () => void
+  onMutationEnd?: () => void
 }
 
 export function AttendanceMarker({
@@ -31,7 +33,9 @@ export function AttendanceMarker({
   currentStatus,
   isConfirmed,
   isReadOnly = false,
-  onStatusChange
+  onStatusChange,
+  onMutationStart,
+  onMutationEnd
 }: AttendanceMarkerProps) {
   const [isPending, startTransition] = useTransition()
   const [localStatus, setLocalStatus] = useState<AttendanceStatus>(currentStatus)
@@ -50,6 +54,7 @@ export function AttendanceMarker({
 
     setLocalStatus(status)
 
+    onMutationStart?.()
     startTransition(async () => {
       try {
         const updated = await markAttendance(tripId, student.id, status)
@@ -69,6 +74,8 @@ export function AttendanceMarker({
         toast.error('Failed to mark attendance', {
           description: error instanceof Error ? error.message : 'Please try again'
         })
+      } finally {
+        onMutationEnd?.()
       }
     })
   }
@@ -107,7 +114,7 @@ export function AttendanceMarker({
           </div>
           {student.grade && (
             <div className="text-xs text-slate-500">
-              Grade {student.grade}
+              {formatGradeLabel(student.grade)}
             </div>
           )}
         </div>
@@ -124,8 +131,10 @@ export function AttendanceMarker({
           variant={localStatus === 'boarded' ? 'default' : 'outline'}
           className={localStatus === 'boarded' ? 'bg-green-600 hover:bg-green-700' : 'hover:bg-green-50 hover:text-green-600'}
         >
-          <CheckCircle2 className="h-4 w-4 mr-1" />
-          Boarded
+          <span className="inline-flex items-center gap-2 leading-none">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>Boarded</span>
+          </span>
         </Button>
         
         <Button
@@ -135,8 +144,10 @@ export function AttendanceMarker({
           variant={localStatus === 'absent' ? 'default' : 'outline'}
           className={localStatus === 'absent' ? 'bg-yellow-600 hover:bg-yellow-700' : 'hover:bg-yellow-50 hover:text-yellow-600'}
         >
-          <MinusCircle className="h-4 w-4 mr-1" />
-          Absent
+          <span className="inline-flex items-center gap-2 leading-none">
+            <MinusCircle className="h-4 w-4 shrink-0" />
+            <span>Absent</span>
+          </span>
         </Button>
         
         <Button
@@ -146,11 +157,20 @@ export function AttendanceMarker({
           variant={localStatus === 'no_show' ? 'default' : 'outline'}
           className={localStatus === 'no_show' ? 'bg-red-600 hover:bg-red-700' : 'hover:bg-red-50 hover:text-red-600'}
         >
-          <XCircle className="h-4 w-4 mr-1" />
-          No Show
+          <span className="inline-flex items-center gap-2 leading-none">
+            <XCircle className="h-4 w-4 shrink-0" />
+            <span>No Show</span>
+          </span>
         </Button>
       </div>
     </div>
   )
+}
+
+function formatGradeLabel(grade: string) {
+  const g = grade.trim()
+  if (!g) return ''
+  if (/^grade\b/i.test(g)) return g
+  return `Grade ${g}`
 }
 
