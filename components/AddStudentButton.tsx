@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
 import { Plus, Loader2, User, GraduationCap } from 'lucide-react'
 import { toast } from 'sonner'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
@@ -20,10 +20,9 @@ interface AddStudentButtonProps {
 }
 
 export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
-  const router = useRouter()
+  const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const [routes, setRoutes] = useState<any[]>([])
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -32,21 +31,11 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Load routes when dialog opens
-  useEffect(() => {
-    if (isOpen) {
-      loadRoutes()
-    }
-  }, [isOpen])
-
-  const loadRoutes = async () => {
-    try {
-      const routesData = await getRoutes()
-      setRoutes(routesData.filter(r => !r.deletedAt))
-    } catch (error) {
-      console.error('Failed to load routes:', error)
-    }
-  }
+  const routesQuery = useQuery<any[]>({
+    queryKey: ['routes'],
+    queryFn: getRoutes as any,
+    enabled: isOpen,
+  })
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -98,7 +87,8 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
         if (onSuccess) {
           onSuccess()
         } else {
-          router.refresh()
+          queryClient.invalidateQueries({ queryKey: ['students'] })
+          queryClient.invalidateQueries({ queryKey: ['routes'] })
         }
       } catch (error) {
         toast.error('Failed to add student', {
@@ -216,11 +206,11 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
                   id="routeId"
                   value={formData.routeId}
                   onChange={(e) => handleChange('routeId', e.target.value)}
-                  disabled={isPending}
+                  disabled={isPending || routesQuery.isLoading}
                   className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="">No route (assign later)</option>
-                  {routes.map((route) => (
+                  {(routesQuery.data ?? []).filter((r: any) => !r.deletedAt).map((route: any) => (
                     <option key={route.id} value={route.id}>
                       {route.name} ({route.type})
                     </option>

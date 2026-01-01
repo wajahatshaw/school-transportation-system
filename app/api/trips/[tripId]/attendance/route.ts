@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTripAttendance, markAttendance, addStudentToTrip, removeStudentFromTrip } from '@/lib/actions'
 import { getSession } from '@/lib/auth/session'
+import { toPublicError } from '@/lib/api/public-errors'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,12 +34,8 @@ export async function GET(
     return NextResponse.json(attendance, { status: 200 })
   } catch (error) {
     console.error('Error fetching attendance:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch attendance'
-    
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
+    const pub = toPublicError(error, 'Failed to load attendance. Please try again.')
+    return NextResponse.json({ error: pub.message }, { status: pub.status })
   }
 }
 
@@ -125,19 +122,11 @@ export async function POST(
     }
   } catch (error) {
     console.error('Error managing attendance:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to manage attendance'
-    
-    if (errorMessage.includes('confirmed trip')) {
-      return NextResponse.json(
-        { error: errorMessage },
-        { status: 409 }
-      )
+    if (error instanceof Error && error.message.includes('confirmed trip')) {
+      return NextResponse.json({ error: 'This trip is confirmed and cannot be modified.' }, { status: 409 })
     }
-    
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    )
+    const pub = toPublicError(error, 'Failed to update attendance. Please try again.')
+    return NextResponse.json({ error: pub.message }, { status: pub.status })
   }
 }
 

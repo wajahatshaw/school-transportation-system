@@ -1,7 +1,4 @@
-import { Suspense } from 'react'
-import { getAuditLogs } from '@/lib/actions'
-import { AuditLogsTable } from '@/components/AuditLogsTable'
-import { TableSkeleton } from '@/components/ui/skeleton'
+import { AuditLogsPageClient } from './audit-logs-page-client'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -16,14 +13,7 @@ export default async function AuditLogsPage() {
         </p>
       </div>
 
-      <Suspense fallback={<TableSkeleton />}>
-        <AuditLogsTableWrapper />
-      </Suspense>
+      <AuditLogsPageClient />
     </div>
   )
-}
-
-async function AuditLogsTableWrapper() {
-  const logs = await getAuditLogs()
-  return <AuditLogsTable logs={logs} />
 }

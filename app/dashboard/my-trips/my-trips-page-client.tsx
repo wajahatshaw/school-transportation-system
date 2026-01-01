@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ClipboardPlus } from 'lucide-react'
 import { getRouteTrips, getRoutes, getDrivers, createRouteTrip } from '@/lib/actions'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { toast } from 'sonner'
@@ -12,28 +13,11 @@ import { AttendanceHistoryTable } from '@/components/AttendanceHistoryTable'
 
 type RouteType = 'AM' | 'PM'
 
-type TripsCacheEntry = {
-  activeTrips: any[]
-  pastTrips: any[]
-  loaded: boolean
-}
-
 export function MyTripsPageClient() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<RouteType>('AM')
-  const [activeTrips, setActiveTrips] = useState<any[]>([])
-  const [pastTrips, setPastTrips] = useState<any[]>([])
-  const [routes, setRoutes] = useState<any[]>([]) // all routes (non-deleted)
-  const [routesLoading, setRoutesLoading] = useState(true)
-  const [drivers, setDrivers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const loadSeq = useRef(0)
-  const tripsCacheRef = useRef<Record<RouteType, TripsCacheEntry>>({
-    AM: { activeTrips: [], pastTrips: [], loaded: false },
-    PM: { activeTrips: [], pastTrips: [], loaded: false }
-  })
   const [createForm, setCreateForm] = useState({
     routeId: '',
     tripDate: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
@@ -41,56 +25,25 @@ export function MyTripsPageClient() {
     driverId: '',
   })
 
-  useEffect(() => {
-    // Switching tabs should NOT refetch every time.
-    // If we've already loaded this tab once, use cached data instantly.
-    const cached = tripsCacheRef.current[activeTab]
-    if (cached?.loaded) {
-      setActiveTrips(cached.activeTrips)
-      setPastTrips(cached.pastTrips)
-      setLoading(false)
-      return
-    }
-    // First time loading this tab: fetch with loader.
-    loadData({ tab: activeTab, force: true, showLoader: true })
-  }, [activeTab])
+  const routesQuery = useQuery({
+    queryKey: ['routes'],
+    queryFn: async () => {
+      const routesData = await getRoutes()
+      return routesData.filter((r: any) => !r.deletedAt)
+    },
+  })
 
-  // Load routes once (for Create Trip modal) to avoid slow dropdown on open
-  useEffect(() => {
-    const loadRoutes = async () => {
-      try {
-        setRoutesLoading(true)
-        const routesData = await getRoutes()
-        setRoutes(routesData.filter(r => !r.deletedAt))
-      } catch {
-        // non-blocking
-      } finally {
-        setRoutesLoading(false)
-      }
-    }
-    loadRoutes()
-  }, [])
+  const driversQuery = useQuery({
+    queryKey: ['drivers'],
+    queryFn: async () => {
+      const driversData = await getDrivers()
+      return driversData.filter((d: any) => !d.deletedAt)
+    },
+  })
 
-  const loadData = async (opts?: { tab?: RouteType; force?: boolean; showLoader?: boolean }) => {
-    const tab = opts?.tab ?? activeTab
-    const force = !!opts?.force
-    const showLoader = opts?.showLoader ?? true
-    const cached = tripsCacheRef.current[tab]
-    if (!force && cached?.loaded) {
-      setActiveTrips(cached.activeTrips)
-      setPastTrips(cached.pastTrips)
-      setLoading(false)
-      return
-    }
-
-    const seq = ++loadSeq.current
-    try {
-      if (showLoader) {
-        setLoading(true)
-        // Clear existing data so we don't flash stale trips while loading
-        setActiveTrips([])
-        setPastTrips([])
-      }
+  const tripsQuery = useQuery({
+    queryKey: ['my-trips', activeTab],
+    queryFn: async () => {
       const todayStr = toLocalYyyyMmDd(new Date())
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
@@ -98,51 +51,51 @@ export function MyTripsPageClient() {
 
       const [activeTripsRaw, pastTripsRaw] = await Promise.all([
         getRouteTrips({
-          startDate: todayStr, // active + upcoming only (no past) - local date string
-          routeType: tab,
+          startDate: todayStr,
+          routeType: activeTab,
           includeConfirmed: true,
           sort: 'asc',
         }),
         getRouteTrips({
-          endDate: yesterdayStr, // past only - local date string
-          routeType: tab,
+          endDate: yesterdayStr,
+          routeType: activeTab,
           includeConfirmed: true,
           sort: 'desc',
-          limit: 50
-        })
+          limit: 50,
+        }),
       ])
 
-      // Ignore out-of-order responses (tab switching fast)
-      if (seq !== loadSeq.current) return
+      return { activeTrips: activeTripsRaw, pastTrips: pastTripsRaw }
+    },
+  })
 
-      tripsCacheRef.current[tab] = {
-        activeTrips: activeTripsRaw,
-        pastTrips: pastTripsRaw,
-        loaded: true
-      }
+  const createTripMutation = useMutation({
+    mutationFn: async () => {
+      if (!createForm.routeId) throw new Error('Please select a route')
+      if (!createForm.tripDate) throw new Error('Please select a date')
 
-      setActiveTrips(activeTripsRaw)
-      setPastTrips(pastTripsRaw)
-    } catch (error) {
-      toast.error('Failed to load trips')
-    } finally {
-      if (seq === loadSeq.current) setLoading(false)
-    }
-  }
+      const tripDate = new Date(`${createForm.tripDate}T00:00:00`)
+      return await createRouteTrip({
+        routeId: createForm.routeId,
+        tripDate,
+        routeType: createForm.routeType,
+        driverId: createForm.driverId || undefined,
+      })
+    },
+    onSuccess: async () => {
+      toast.success('Trip created')
+      setCreateOpen(false)
+      // No TTL caching: always show latest data after a mutation via invalidation.
+      await queryClient.invalidateQueries({ queryKey: ['my-trips'] })
+    },
+    onError: (error) => {
+      toast.error('Failed to create trip', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      })
+    },
+  })
 
   // Load drivers once (used in Create Trip modal)
-  useEffect(() => {
-    const loadDrivers = async () => {
-      try {
-        const driversData = await getDrivers()
-        setDrivers(driversData.filter(d => !d.deletedAt))
-      } catch {
-        // Non-blocking
-      }
-    }
-    loadDrivers()
-  }, [])
-
   const openCreateModal = () => {
     setCreateForm({
       routeId: '',
@@ -153,46 +106,17 @@ export function MyTripsPageClient() {
     setCreateOpen(true)
   }
 
-  const submitCreateModal = async () => {
-    if (!createForm.routeId) {
-      toast.error('Please select a route')
-      return
-    }
-    if (!createForm.tripDate) {
-      toast.error('Please select a date')
-      return
-    }
-
-    try {
-      setCreating(true)
-      const tripDate = new Date(`${createForm.tripDate}T00:00:00`)
-      const trip = await createRouteTrip({
-        routeId: createForm.routeId,
-        tripDate,
-        routeType: createForm.routeType,
-        driverId: createForm.driverId || undefined,
-      })
-
-      toast.success('Trip created')
-      setCreateOpen(false)
-      // Do not auto-navigate; refresh only the current tab cache (no loader flash)
-      await loadData({ tab: activeTab, force: true, showLoader: false })
-    } catch (error) {
-      toast.error('Failed to create trip', {
-        description: error instanceof Error ? error.message : 'Please try again'
-      })
-    } finally {
-      setCreating(false)
-    }
-  }
-
   const handleOpenTrip = (tripId: string) => {
     // Trip execution happens in Attendance trip detail
     router.push(`/dashboard/attendance/${tripId}`)
   }
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const activeTrips = tripsQuery.data?.activeTrips ?? []
+  const pastTrips = tripsQuery.data?.pastTrips ?? []
+  const loading = tripsQuery.isLoading && !tripsQuery.data
+  const creating = createTripMutation.isPending
+  const routes = routesQuery.data ?? []
+  const drivers = driversQuery.data ?? []
 
   const routesForType = useMemo(() => {
     return routes.filter((r) => r.type === createForm.routeType)
@@ -309,10 +233,10 @@ export function MyTripsPageClient() {
                 value={createForm.routeId}
                 onChange={(e) => setCreateForm((p) => ({ ...p, routeId: e.target.value }))}
                 className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-                disabled={creating || routesLoading}
+                disabled={creating || routesQuery.isLoading}
               >
                 <option value="">
-                  {routesLoading ? 'Loading routes…' : 'Select a route…'}
+                  {routesQuery.isLoading ? 'Loading routes…' : 'Select a route…'}
                 </option>
                 {routesForType.map((r) => (
                   <option key={r.id} value={r.id}>
@@ -331,7 +255,7 @@ export function MyTripsPageClient() {
                 value={createForm.driverId}
                 onChange={(e) => setCreateForm((p) => ({ ...p, driverId: e.target.value }))}
                 className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
-                disabled={creating}
+                disabled={creating || driversQuery.isLoading}
               >
                 <option value="">Use route default / Unassigned</option>
                 {drivers.map((d) => (
@@ -355,7 +279,7 @@ export function MyTripsPageClient() {
               <Button
                 type="button"
                 className="flex-1"
-                onClick={submitCreateModal}
+                onClick={() => createTripMutation.mutate()}
                 disabled={creating}
               >
                 {creating ? 'Creating...' : 'Create Trip'}

@@ -1,7 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { VehiclesTable } from '@/components/VehiclesTable'
+import { getVehicles } from '@/lib/actions'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback } from 'react'
+import { TableSkeleton } from '@/components/ui/skeleton'
 
 // Type definition to avoid Prisma client import issues
 type Vehicle = {
@@ -17,17 +20,24 @@ type Vehicle = {
   updatedAt: Date
 }
 
-interface VehiclesPageClientProps {
-  initialVehicles: Vehicle[]
-}
+export function VehiclesPageClient() {
+  const queryClient = useQueryClient()
 
-export function VehiclesPageClient({ initialVehicles }: VehiclesPageClientProps) {
-  const router = useRouter()
+  const vehiclesQuery = useQuery<Vehicle[]>({
+    queryKey: ['vehicles'],
+    queryFn: getVehicles as any,
+  })
 
-  const handleUpdate = () => {
-    router.refresh()
+  const handleUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+    // vehicle updates can affect routes capacity/assignment display
+    queryClient.invalidateQueries({ queryKey: ['routes'] })
+  }, [queryClient])
+
+  if (vehiclesQuery.isLoading && !vehiclesQuery.data) {
+    return <TableSkeleton />
   }
 
-  return <VehiclesTable vehicles={initialVehicles} onUpdate={handleUpdate} />
+  return <VehiclesTable vehicles={vehiclesQuery.data ?? []} onUpdate={handleUpdate} />
 }
 

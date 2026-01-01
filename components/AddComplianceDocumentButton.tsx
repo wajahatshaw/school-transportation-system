@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { Plus, Loader2, FileText, Calendar } from 'lucide-react'
 import { createComplianceDocument } from '@/lib/actions'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,7 @@ interface AddComplianceDocumentButtonProps {
 }
 
 export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentButtonProps) {
-  const router = useRouter()
+  const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [formData, setFormData] = useState({
@@ -65,8 +65,10 @@ export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentB
         setIsOpen(false)
         setFormData({ docType: '', issuedAt: '', expiresAt: '', fileUrl: '' })
         setErrors({})
-        // Refresh the page to show the new document
-        router.refresh()
+        // Invalidate caches so UI updates everywhere
+        queryClient.invalidateQueries({ queryKey: ['compliance-documents', driverId] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-overview'] })
+        queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
       } catch (error) {
         toast.error('Failed to add document', {
           description: 'Please try again or contact support if the problem persists.'

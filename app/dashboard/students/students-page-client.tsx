@@ -1,36 +1,29 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback } from 'react'
 import { Student } from '@prisma/client'
 import { getStudents } from '@/lib/actions'
 import { StudentsTable } from '@/components/StudentsTable'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { TableSkeleton } from '@/components/ui/skeleton'
 
-interface StudentsPageClientProps {
-  initialStudents: Student[]
-}
+export function StudentsPageClient() {
+  const queryClient = useQueryClient()
 
-export function StudentsPageClient({ initialStudents }: StudentsPageClientProps) {
-  const [students, setStudents] = useState(initialStudents)
-  const [isPending, startTransition] = useTransition()
-  const router = useRouter()
+  const studentsQuery = useQuery<Student[]>({
+    queryKey: ['students'],
+    queryFn: getStudents,
+  })
 
-  // Sync state when props change (after router.refresh())
-  useEffect(() => {
-    setStudents(initialStudents)
-  }, [initialStudents])
+  const handleUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['students'] })
+    // student route assignment can affect routes view
+    queryClient.invalidateQueries({ queryKey: ['routes'] })
+  }, [queryClient])
 
-  const handleUpdate = () => {
-    startTransition(async () => {
-      try {
-        const updatedStudents = await getStudents()
-        setStudents(updatedStudents)
-        router.refresh()
-      } catch (error) {
-        console.error('Failed to refresh students:', error)
-      }
-    })
+  if (studentsQuery.isLoading && !studentsQuery.data) {
+    return <TableSkeleton />
   }
 
-  return <StudentsTable students={students} onUpdate={handleUpdate} />
+  return <StudentsTable students={studentsQuery.data ?? []} onUpdate={handleUpdate} />
 }

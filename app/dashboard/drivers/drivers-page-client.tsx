@@ -1,36 +1,27 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback } from 'react'
 import { Driver } from '@prisma/client'
 import { getDrivers } from '@/lib/actions'
 import { DriversTable } from '@/components/DriversTable'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { TableSkeleton } from '@/components/ui/skeleton'
 
-interface DriversPageClientProps {
-  initialDrivers: Driver[]
-}
+export function DriversPageClient() {
+  const queryClient = useQueryClient()
 
-export function DriversPageClient({ initialDrivers }: DriversPageClientProps) {
-  const [drivers, setDrivers] = useState(initialDrivers)
-  const [isPending, startTransition] = useTransition()
-  const router = useRouter()
+  const driversQuery = useQuery<Driver[]>({
+    queryKey: ['drivers'],
+    queryFn: getDrivers,
+  })
 
-  // Sync state when props change (after router.refresh())
-  useEffect(() => {
-    setDrivers(initialDrivers)
-  }, [initialDrivers])
+  const handleUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['drivers'] })
+  }, [queryClient])
 
-  const handleUpdate = () => {
-    startTransition(async () => {
-      try {
-        const updatedDrivers = await getDrivers()
-        setDrivers(updatedDrivers)
-        router.refresh()
-      } catch (error) {
-        console.error('Failed to refresh drivers:', error)
-      }
-    })
+  if (driversQuery.isLoading && !driversQuery.data) {
+    return <TableSkeleton />
   }
 
-  return <DriversTable drivers={drivers} onUpdate={handleUpdate} />
+  return <DriversTable drivers={driversQuery.data ?? []} onUpdate={handleUpdate} />
 }

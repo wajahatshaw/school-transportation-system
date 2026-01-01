@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Filter, ChevronDown } from 'lucide-react'
 import { getRouteTrips, getRoutes, getDrivers } from '@/lib/actions'
@@ -8,17 +8,11 @@ import { Button } from '@/components/ui/button'
 import { AttendanceHistoryTable } from '@/components/AttendanceHistoryTable'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useQuery } from '@tanstack/react-query'
 
 export function AttendancePageClient({ role }: { role: string }) {
   const router = useRouter()
-  const [trips, setTrips] = useState<any[]>([])
-  const [routes, setRoutes] = useState<any[]>([])
-  const [drivers, setDrivers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [metaLoading, setMetaLoading] = useState(false)
-  const [hasAppliedOnce, setHasAppliedOnce] = useState(false)
   const isDriver = role === 'driver'
-  const loadSeq = useRef(0)
   
   // Filters
   const [startDate, setStartDate] = useState(() => {
@@ -32,72 +26,56 @@ export function AttendancePageClient({ role }: { role: string }) {
   const [selectedRoute, setSelectedRoute] = useState('')
   const [selectedDriver, setSelectedDriver] = useState('')
   const [selectedType, setSelectedType] = useState<'AM' | 'PM' | ''>('')
+  const [applied, setApplied] = useState(() => ({
+    startDate,
+    endDate,
+    routeId: '',
+    driverId: '',
+    routeType: '' as '' | 'AM' | 'PM',
+  }))
 
-  useEffect(() => {
-    if (isDriver) {
-      loadTrips()
-      return
-    }
-    // Admin: load metadata + initial trips once. After that, only Apply reloads trips.
-    ;(async () => {
-      await Promise.all([loadMetadata(), loadTrips()])
-      setHasAppliedOnce(true)
-    })()
-  }, [])
+  const routesQuery = useQuery({
+    queryKey: ['routes'],
+    queryFn: () => getRoutes(),
+    enabled: !isDriver,
+  })
 
-  const loadMetadata = async () => {
-    const seq = ++loadSeq.current
-    try {
-      setMetaLoading(true)
-      const [routesData, driversData] = await Promise.all([
-        getRoutes(),
-        getDrivers()
-      ])
-      if (seq !== loadSeq.current) return
-      setRoutes(routesData.filter(r => !r.deletedAt))
-      setDrivers(driversData.filter(d => !d.deletedAt))
-    } catch (error) {
-      toast.error('Failed to load filters')
-    } finally {
-      if (seq === loadSeq.current) setMetaLoading(false)
-    }
-  }
+  const driversQuery = useQuery({
+    queryKey: ['drivers'],
+    queryFn: () => getDrivers(),
+    enabled: !isDriver,
+  })
 
-  const loadTrips = async () => {
-    try {
-      setLoading(true)
+  const tripsQuery = useQuery({
+    queryKey: ['attendance-trips', isDriver ? 'driver' : 'admin', applied],
+    queryFn: async () => {
       const filters: any = isDriver
         ? (() => {
             const today = new Date()
             const future = new Date()
-            future.setDate(future.getDate() + 14) // show next 2 weeks (upcoming read-only)
+            future.setDate(future.getDate() + 14)
             return {
               startDate: toLocalYyyyMmDd(today),
               endDate: toLocalYyyyMmDd(future),
               includeConfirmed: true,
-              sort: 'asc'
+              sort: 'asc',
             }
           })()
         : {
-            startDate,
-            endDate,
-        includeConfirmed: true
-      }
-      
+            startDate: applied.startDate,
+            endDate: applied.endDate,
+            includeConfirmed: true,
+          }
+
       if (!isDriver) {
-      if (selectedRoute) filters.routeId = selectedRoute
-      if (selectedDriver) filters.driverId = selectedDriver
-      if (selectedType) filters.routeType = selectedType
+        if (applied.routeId) filters.routeId = applied.routeId
+        if (applied.driverId) filters.driverId = applied.driverId
+        if (applied.routeType) filters.routeType = applied.routeType
       }
-      
-      const tripsData = await getRouteTrips(filters)
-      setTrips(tripsData)
-    } catch (error) {
-      toast.error('Failed to load attendance data')
-    } finally {
-      setLoading(false)
-    }
-  }
+
+      return await getRouteTrips(filters)
+    },
+  })
 
   const handleTripClick = (tripId: string) => {
     router.push(`/dashboard/attendance/${tripId}`)
@@ -112,14 +90,24 @@ export function AttendancePageClient({ role }: { role: string }) {
     setSelectedDriver('')
     setSelectedType('')
     if (!isDriver) {
-      // Clear triggers an immediate refresh (admin)
-      loadTrips()
-      setHasAppliedOnce(true)
+      setApplied({
+        startDate: date.toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0],
+        routeId: '',
+        driverId: '',
+        routeType: '',
+      })
     }
   }
 
-  const routeOptions = useMemo(() => routes, [routes])
-  const driverOptions = useMemo(() => drivers, [drivers])
+  const routeOptions = useMemo(
+    () => ((routesQuery.data ?? []).filter((r: any) => !r.deletedAt)),
+    [routesQuery.data]
+  )
+  const driverOptions = useMemo(
+    () => ((driversQuery.data ?? []).filter((d: any) => !d.deletedAt)),
+    [driversQuery.data]
+  )
 
   const inputBase =
     'w-full h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2'
@@ -182,10 +170,10 @@ export function AttendancePageClient({ role }: { role: string }) {
                 value={selectedRoute}
                 onChange={(e) => setSelectedRoute(e.target.value)}
                 className={selectBase}
-                disabled={metaLoading}
+                disabled={routesQuery.isLoading}
               >
                 <option value="">
-                  {metaLoading ? 'Loading routes…' : 'All Routes'}
+                  {routesQuery.isLoading ? 'Loading routes…' : 'All Routes'}
                 </option>
                 {routeOptions.map((route) => (
                   <option key={route.id} value={route.id}>
@@ -193,7 +181,7 @@ export function AttendancePageClient({ role }: { role: string }) {
                   </option>
                 ))}
               </select>
-              {metaLoading && <Skeleton className="absolute inset-0 rounded-lg opacity-20" />}
+              {routesQuery.isLoading && <Skeleton className="absolute inset-0 rounded-lg opacity-20" />}
             </div>
           </div>
 
@@ -207,10 +195,10 @@ export function AttendancePageClient({ role }: { role: string }) {
                 value={selectedDriver}
                 onChange={(e) => setSelectedDriver(e.target.value)}
                 className={selectBase}
-                disabled={metaLoading}
+                disabled={driversQuery.isLoading}
               >
                 <option value="">
-                  {metaLoading ? 'Loading drivers…' : 'All Drivers'}
+                  {driversQuery.isLoading ? 'Loading drivers…' : 'All Drivers'}
                 </option>
                 {driverOptions.map((driver) => (
                   <option key={driver.id} value={driver.id}>
@@ -218,7 +206,7 @@ export function AttendancePageClient({ role }: { role: string }) {
                   </option>
                 ))}
               </select>
-              {metaLoading && <Skeleton className="absolute inset-0 rounded-lg opacity-20" />}
+              {driversQuery.isLoading && <Skeleton className="absolute inset-0 rounded-lg opacity-20" />}
             </div>
           </div>
 
@@ -244,19 +232,26 @@ export function AttendancePageClient({ role }: { role: string }) {
         <div className="flex flex-wrap gap-2 mt-5">
           <Button
             onClick={async () => {
-              await loadTrips()
-              setHasAppliedOnce(true)
+              setApplied({
+                startDate,
+                endDate,
+                routeId: selectedRoute,
+                driverId: selectedDriver,
+                routeType: selectedType,
+              })
             }}
             size="sm"
-            disabled={loading}
+            disabled={tripsQuery.isFetching}
           >
-            {loading && !hasAppliedOnce ? 'Loading…' : 'Apply Filters'}
+            {tripsQuery.isFetching ? 'Loading…' : 'Apply Filters'}
           </Button>
-          <Button onClick={handleClearFilters} variant="outline" size="sm" disabled={loading}>
+          <Button onClick={handleClearFilters} variant="outline" size="sm" disabled={tripsQuery.isFetching}>
             Clear Filters
           </Button>
           <div className="ml-auto text-xs text-slate-500 flex items-center">
-            {metaLoading ? 'Loading lists…' : `${routeOptions.length} routes • ${driverOptions.length} drivers`}
+            {routesQuery.isLoading || driversQuery.isLoading
+              ? 'Loading lists…'
+              : `${routeOptions.length} routes • ${driverOptions.length} drivers`}
           </div>
         </div>
       </div>
@@ -265,14 +260,14 @@ export function AttendancePageClient({ role }: { role: string }) {
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-slate-600">
-          {loading ? 'Loading...' : `Found ${trips.length} trip(s)`}
+          {tripsQuery.isFetching ? 'Loading...' : `Found ${(tripsQuery.data ?? []).length} trip(s)`}
         </div>
       </div>
 
       {/* Trips Table (Admin) / Mobile cards (Driver) */}
       {isDriver ? (
         <div className="space-y-3">
-          {loading && (
+          {tripsQuery.isFetching && !(tripsQuery.data && tripsQuery.data.length > 0) && (
             <>
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="rounded-lg border border-slate-200 bg-white p-4">
@@ -289,7 +284,7 @@ export function AttendancePageClient({ role }: { role: string }) {
             </>
           )}
 
-          {trips.map((trip) => {
+          {(tripsQuery.data ?? []).map((trip) => {
             const tripDate = new Date(trip.tripDate)
             const today = new Date()
             today.setHours(0, 0, 0, 0)
@@ -352,8 +347,8 @@ export function AttendancePageClient({ role }: { role: string }) {
         </div>
       ) : (
       <AttendanceHistoryTable
-        trips={trips}
-        loading={loading}
+        trips={tripsQuery.data ?? []}
+        loading={tripsQuery.isFetching && !tripsQuery.data}
         onTripClick={handleTripClick}
       />
       )}

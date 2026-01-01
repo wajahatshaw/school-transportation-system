@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { Plus, Loader2, Bus } from 'lucide-react'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
@@ -20,7 +20,7 @@ interface AddVehicleButtonProps {
 
 export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
   const MAX_VEHICLE_CAPACITY = 60
-  const router = useRouter()
+  const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [formData, setFormData] = useState({
@@ -84,10 +84,11 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
         setFormData({ name: '', capacity: '', licensePlate: '', vehicleType: '' })
         setErrors({})
         
-        // Refresh the page data immediately
-        router.refresh()
         if (onSuccess) {
           onSuccess()
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['vehicles'] })
+          queryClient.invalidateQueries({ queryKey: ['routes'] })
         }
       } catch (error) {
         toast.error('Failed to add vehicle', {
