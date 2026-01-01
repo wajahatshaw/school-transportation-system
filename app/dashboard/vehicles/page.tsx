@@ -1,8 +1,5 @@
 import { Suspense } from 'react'
-import { getVehicles } from '@/lib/actions'
-import { VehiclesTable } from '@/components/VehiclesTable'
 import { AddVehicleButton } from '@/components/AddVehicleButton'
-import { TableSkeleton } from '@/components/ui/skeleton'
 import { VehiclesPageClient } from './vehicles-page-client'
 
 export default async function VehiclesPage() {
@@ -16,15 +13,7 @@ export default async function VehiclesPage() {
         <AddVehicleButton />
       </div>
 
-      <Suspense fallback={<TableSkeleton />}>
-        <VehiclesTableWrapper />
-      </Suspense>
+      <VehiclesPageClient />
     </div>
   )
 }
-
-async function VehiclesTableWrapper() {
-  const vehicles = await getVehicles()
-  return <VehiclesPageClient initialVehicles={vehicles} />
-}
-

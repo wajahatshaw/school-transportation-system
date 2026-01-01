@@ -53,6 +53,14 @@ export async function getOrCreateInternalUser(authUserId: string, email: string)
     where: { authUserId }
   })
   
+  // If not found by authUserId, try by email (email is unique in our users table)
+  // This prevents Prisma P2002 when an account already exists for the same email.
+  if (!user) {
+    user = await prisma.user.findUnique({
+      where: { email }
+    })
+  }
+
   // Create if doesn't exist
   if (!user) {
     user = await prisma.user.create({
@@ -60,6 +68,12 @@ export async function getOrCreateInternalUser(authUserId: string, email: string)
         authUserId,
         email
       }
+    })
+  } else if (user.authUserId !== authUserId) {
+    // Keep internal record consistent with Supabase auth user id (email is unique in Supabase).
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { authUserId, email }
     })
   }
   

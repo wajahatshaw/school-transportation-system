@@ -315,6 +315,59 @@ export async function getComplianceDocuments(driverId: string) {
   })
 }
 
+// Compliance Overview (documents + driver relation) for /dashboard/compliance
+export async function getComplianceOverviewDocuments() {
+  const context = await getTenantContext()
+
+  return await withTenantContext(context, async (tx) => {
+    const docs = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      driver_id: string
+      doc_type: string
+      issued_at: Date | null
+      expires_at: Date
+      file_url: string | null
+      deleted_at: Date | null
+      deleted_by: string | null
+      created_at: Date
+      updated_at: Date
+    }>>`
+      SELECT * FROM app.v_driver_compliance_documents
+      ORDER BY expires_at ASC
+    `
+
+    const driverIds = [...new Set(docs.map((d) => d.driver_id))]
+    const drivers = driverIds.length
+      ? await tx.driver.findMany({
+          where: { id: { in: driverIds }, tenantId: context.tenantId, deletedAt: null },
+        })
+      : []
+    const driverMap = new Map(drivers.map((d) => [d.id, d]))
+
+    return docs
+      .map((d) => {
+        const driver = driverMap.get(d.driver_id)
+        if (!driver) return null
+        return {
+          id: d.id,
+          tenantId: d.tenant_id,
+          driverId: d.driver_id,
+          docType: d.doc_type,
+          issuedAt: d.issued_at,
+          expiresAt: d.expires_at,
+          fileUrl: d.file_url,
+          deletedAt: d.deleted_at,
+          deletedBy: d.deleted_by,
+          createdAt: d.created_at,
+          updatedAt: d.updated_at,
+          driver,
+        }
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+  })
+}
+
 export async function createComplianceDocument(data: {
   driverId: string
   docType: string
@@ -579,6 +632,112 @@ export async function getAuditLogs(filters?: { tableName?: string; action?: stri
       ip: l.ip,
       createdAt: l.created_at
     }))
+  })
+}
+
+// ============================================================================
+// DASHBOARD SUMMARY (for cached dashboard UI)
+// ============================================================================
+
+export async function getDashboardData() {
+  const context = await getTenantContext()
+
+  return await withTenantContext(context, async (tx) => {
+    const [studentsCountRows, driversCountRows, complianceCountsRows, recentLogs] = await Promise.all([
+      tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM app.v_students`,
+      tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM app.v_drivers`,
+      tx.$queryRaw<Array<{ expired: bigint; expiring: bigint; valid: bigint }>>`
+        SELECT
+          COUNT(*) FILTER (WHERE expires_at::date < CURRENT_DATE) AS expired,
+          COUNT(*) FILTER (
+            WHERE expires_at::date >= CURRENT_DATE
+              AND expires_at::date <= (CURRENT_DATE + INTERVAL '30 days')
+          ) AS expiring,
+          COUNT(*) FILTER (WHERE expires_at::date > (CURRENT_DATE + INTERVAL '30 days')) AS valid
+        FROM app.v_driver_compliance_documents
+      `,
+      tx.$queryRaw<Array<{
+        id: string
+        table_name: string
+        record_id: string
+        action: string
+        created_at: Date
+      }>>`
+        SELECT id, table_name, record_id, action, created_at
+        FROM app.v_audit_logs
+        ORDER BY created_at DESC
+        LIMIT 5
+      `,
+    ])
+
+    const studentsCount = Number(studentsCountRows[0]?.count || 0)
+    const driversCount = Number(driversCountRows[0]?.count || 0)
+    const expiredCount = Number(complianceCountsRows[0]?.expired || 0)
+    const expiringCount = Number(complianceCountsRows[0]?.expiring || 0)
+    const validCount = Number(complianceCountsRows[0]?.valid || 0)
+
+    // Alerts (top 5 expired/expiring)
+    const [expiredDocs, expiringDocs] = await Promise.all([
+      tx.$queryRaw<Array<{ driver_id: string; doc_type: string; expires_at: Date }>>`
+        SELECT driver_id, doc_type, expires_at
+        FROM app.v_driver_compliance_documents
+        WHERE expires_at::date < CURRENT_DATE
+        ORDER BY expires_at ASC
+        LIMIT 5
+      `,
+      tx.$queryRaw<Array<{ driver_id: string; doc_type: string; expires_at: Date }>>`
+        SELECT driver_id, doc_type, expires_at
+        FROM app.v_driver_compliance_documents
+        WHERE expires_at::date >= CURRENT_DATE
+          AND expires_at::date <= (CURRENT_DATE + INTERVAL '30 days')
+        ORDER BY expires_at ASC
+        LIMIT 5
+      `,
+    ])
+
+    const alertDriverIds = Array.from(
+      new Set([...expiredDocs.map((d) => d.driver_id), ...expiringDocs.map((d) => d.driver_id)])
+    )
+
+    const drivers = alertDriverIds.length
+      ? await tx.driver.findMany({
+          where: { id: { in: alertDriverIds }, tenantId: context.tenantId, deletedAt: null },
+        })
+      : []
+    const driverMap = new Map(drivers.map((d) => [d.id, d]))
+
+    return {
+      studentsCount,
+      driversCount,
+      complianceCounts: {
+        expired: expiredCount,
+        expiring: expiringCount,
+        valid: validCount,
+      },
+      complianceAlerts: {
+        expired: expiredDocs
+          .map((d) => {
+            const driver = driverMap.get(d.driver_id)
+            if (!driver) return null
+            return { driverId: d.driver_id, docType: d.doc_type, expiresAt: d.expires_at, driver }
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null),
+        expiring: expiringDocs
+          .map((d) => {
+            const driver = driverMap.get(d.driver_id)
+            if (!driver) return null
+            return { driverId: d.driver_id, docType: d.doc_type, expiresAt: d.expires_at, driver }
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null),
+      },
+      recentAuditLogs: recentLogs.map((l) => ({
+        id: l.id,
+        tableName: l.table_name,
+        recordId: l.record_id,
+        action: l.action,
+        createdAt: l.created_at,
+      })),
+    }
   })
 }
 

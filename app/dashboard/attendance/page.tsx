@@ -1,8 +1,6 @@
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
 import { AttendancePageClient } from './attendance-page-client'
-import { Skeleton } from '@/components/ui/skeleton'
 
 export default async function AttendancePage() {
   const session = await getSession()
@@ -30,19 +28,7 @@ export default async function AttendancePage() {
         </p>
       </div>
 
-      <Suspense fallback={<LoadingSkeleton />}>
-        <AttendancePageClient role={session.role || 'user'} />
-      </Suspense>
+      <AttendancePageClient role={session.role || 'user'} />
     </div>
   )
 }
-
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-4">
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  )
-}
-

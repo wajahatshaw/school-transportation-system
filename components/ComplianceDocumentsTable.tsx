@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { formatDate, getComplianceStatus } from '@/lib/utils'
 import { EditComplianceDocumentModal } from './EditComplianceDocumentModal'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface ComplianceDocumentsTableProps {
   documents: DriverComplianceDocument[]
@@ -21,6 +22,7 @@ export function ComplianceDocumentsTable({
   documents: initialDocuments,
   driverId,
 }: ComplianceDocumentsTableProps) {
+  const queryClient = useQueryClient()
   const [documents, setDocuments] = useState(initialDocuments)
   const [editingDoc, setEditingDoc] = useState<DriverComplianceDocument | null>(null)
   const [deletingDoc, setDeletingDoc] = useState<DriverComplianceDocument | null>(null)
@@ -47,6 +49,9 @@ export function ComplianceDocumentsTable({
       try {
         await updateComplianceDocument(editingDoc.id, data)
         toast.success('Document updated successfully')
+        queryClient.invalidateQueries({ queryKey: ['compliance-documents', driverId] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-overview'] })
+        queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
       } catch (error) {
         setDocuments((prev) => prev.map((d) => (d.id === editingDoc.id ? editingDoc : d)))
         toast.error('Failed to update document')
@@ -64,6 +69,9 @@ export function ComplianceDocumentsTable({
       try {
         await deleteComplianceDocument(deletingDoc.id)
         toast.success('Document deleted successfully')
+        queryClient.invalidateQueries({ queryKey: ['compliance-documents', driverId] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-overview'] })
+        queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
       } catch (error) {
         setDocuments((prev) => [...prev, deletingDoc])
         toast.error('Failed to delete document')

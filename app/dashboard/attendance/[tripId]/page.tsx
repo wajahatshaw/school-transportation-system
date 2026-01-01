@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { redirect } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
 import { TripDetailViewClient } from './trip-detail-view-client'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 export default async function TripDetailPage({
   params
 }: {
-  params: { tripId: string }
+  params: Promise<{ tripId: string }>
 }) {
   const session = await getSession()
   
@@ -19,9 +19,16 @@ export default async function TripDetailPage({
     redirect('/select-tenant')
   }
 
+  // Netlify/Next 16 can provide params as a Promise; unwrap safely
+  const resolvedParams = await params
+  const tripId = resolvedParams?.tripId
+  if (!tripId || typeof tripId !== 'string') {
+    notFound()
+  }
+
   return (
     <Suspense fallback={<LoadingSkeleton />}>
-      <TripDetailViewClient tripId={params.tripId} role={session.role || 'user'} />
+      <TripDetailViewClient tripId={tripId} role={session.role || 'user'} />
     </Suspense>
   )
 }

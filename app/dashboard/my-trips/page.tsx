@@ -1,8 +1,6 @@
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
 import { MyTripsPageClient } from './my-trips-page-client'
-import { Skeleton } from '@/components/ui/skeleton'
 
 export default async function MyTripsPage() {
   const session = await getSession()
@@ -24,19 +22,7 @@ export default async function MyTripsPage() {
         </p>
       </div>
 
-      <Suspense fallback={<LoadingSkeleton />}>
-        <MyTripsPageClient />
-      </Suspense>
+      <MyTripsPageClient />
     </div>
   )
 }
-
-function LoadingSkeleton() {
-  return (
-    <div className="space-y-4">
-      <Skeleton className="h-12 w-full" />
-      <Skeleton className="h-64 w-full" />
-    </div>
-  )
-}
-

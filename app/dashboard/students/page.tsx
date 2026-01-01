@@ -1,8 +1,5 @@
 import { Suspense } from 'react'
-import { getStudents } from '@/lib/actions'
-import { StudentsTable } from '@/components/StudentsTable'
 import { AddStudentButton } from '@/components/AddStudentButton'
-import { TableSkeleton } from '@/components/ui/skeleton'
 import { StudentsPageClient } from './students-page-client'
 
 export default async function StudentsPage() {
@@ -16,14 +13,7 @@ export default async function StudentsPage() {
         <AddStudentButton />
       </div>
 
-      <Suspense fallback={<TableSkeleton />}>
-        <StudentsTableWrapper />
-      </Suspense>
+      <StudentsPageClient />
     </div>
   )
-}
-
-async function StudentsTableWrapper() {
-  const students = await getStudents()
-  return <StudentsPageClient initialStudents={students} />
 }

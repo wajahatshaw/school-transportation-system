@@ -16,6 +16,7 @@ import {
 import { NavLink } from '@/components/NavLink'
 import { Sidebar, TopBar } from '@/components/layout/header'
 import { ToastProvider } from '@/components/ui/toast'
+import { ReactQueryProvider } from '@/lib/react-query/provider'
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode
@@ -47,7 +48,7 @@ export function DashboardLayoutClient({ children, tenantName, userEmail, tenantI
       : navItems
 
   return (
-    <>
+    <ReactQueryProvider>
       <ToastProvider />
       <div className="min-h-screen bg-slate-50">
         <TopBar
@@ -78,6 +79,6 @@ export function DashboardLayoutClient({ children, tenantName, userEmail, tenantI
           </main>
         </div>
       </div>
-    </>
+    </ReactQueryProvider>
   )
 }

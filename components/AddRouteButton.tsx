@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useMemo, useState, useTransition } from 'react'
 import { Plus, Loader2, MapPin, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { getVehicles, getDrivers } from '@/lib/actions'
 import {
   Dialog,
   DialogContent,
@@ -33,13 +34,13 @@ interface Stop {
 }
 
 interface AddRouteButtonProps {
-  vehicles: Vehicle[]
-  drivers: Driver[]
+  vehicles?: Vehicle[]
+  drivers?: Driver[]
   onSuccess?: () => void
 }
 
 export function AddRouteButton({ vehicles, drivers, onSuccess }: AddRouteButtonProps) {
-  const router = useRouter()
+  const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [formData, setFormData] = useState({
@@ -50,6 +51,26 @@ export function AddRouteButton({ vehicles, drivers, onSuccess }: AddRouteButtonP
   })
   const [stops, setStops] = useState<Stop[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const vehiclesQuery = useQuery<Vehicle[]>({
+    queryKey: ['vehicles'],
+    queryFn: getVehicles as any,
+    enabled: !vehicles,
+  })
+
+  const driversQuery = useQuery<Driver[]>({
+    queryKey: ['drivers'],
+    queryFn: getDrivers as any,
+    enabled: !drivers,
+  })
+
+  const effectiveVehicles = useMemo(() => {
+    return vehicles ?? vehiclesQuery.data ?? []
+  }, [vehicles, vehiclesQuery.data])
+
+  const effectiveDrivers = useMemo(() => {
+    return drivers ?? driversQuery.data ?? []
+  }, [drivers, driversQuery.data])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -96,10 +117,12 @@ export function AddRouteButton({ vehicles, drivers, onSuccess }: AddRouteButtonP
         setStops([])
         setErrors({})
         
-        // Refresh the page data immediately
-        router.refresh()
         if (onSuccess) {
           onSuccess()
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['routes'] })
+          // routes creation can affect trips
+          queryClient.invalidateQueries({ queryKey: ['my-trips'] })
         }
       } catch (error) {
         toast.error('Failed to add route', {
@@ -216,11 +239,11 @@ export function AddRouteButton({ vehicles, drivers, onSuccess }: AddRouteButtonP
                   id="vehicleId"
                   value={formData.vehicleId}
                   onChange={(e) => handleChange('vehicleId', e.target.value)}
-                  disabled={isPending}
+                  disabled={isPending || (!vehicles && vehiclesQuery.isLoading)}
                   className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="">Unassigned</option>
-                  {vehicles.map((vehicle) => (
+                  {effectiveVehicles.map((vehicle) => (
                     <option key={vehicle.id} value={vehicle.id}>
                       {vehicle.name} ({vehicle.capacity} seats)
                     </option>
@@ -238,11 +261,11 @@ export function AddRouteButton({ vehicles, drivers, onSuccess }: AddRouteButtonP
                   id="driverId"
                   value={formData.driverId}
                   onChange={(e) => handleChange('driverId', e.target.value)}
-                  disabled={isPending}
+                  disabled={isPending || (!drivers && driversQuery.isLoading)}
                   className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="">Unassigned</option>
-                  {drivers.map((driver) => (
+                  {effectiveDrivers.map((driver) => (
                     <option key={driver.id} value={driver.id}>
                       {driver.firstName} {driver.lastName}
                     </option>

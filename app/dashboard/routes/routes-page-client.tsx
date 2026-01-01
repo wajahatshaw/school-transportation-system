@@ -1,7 +1,10 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { RoutesTable } from '@/components/RoutesTable'
+import { getRoutes, getVehicles, getDrivers } from '@/lib/actions'
+import { useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { TableSkeleton } from '@/components/ui/skeleton'
 
 // Type definitions to avoid Prisma client import issues
 type Vehicle = {
@@ -48,19 +51,43 @@ interface RouteWithRelations extends Route {
   driver?: Driver | null
 }
 
-interface RoutesPageClientProps {
-  initialRoutes: RouteWithRelations[]
-  vehicles: Vehicle[]
-  drivers: Driver[]
-}
+export function RoutesPageClient() {
+  const queryClient = useQueryClient()
 
-export function RoutesPageClient({ initialRoutes, vehicles, drivers }: RoutesPageClientProps) {
-  const router = useRouter()
+  const routesQuery = useQuery<RouteWithRelations[]>({
+    queryKey: ['routes'],
+    queryFn: getRoutes as any,
+  })
 
-  const handleUpdate = () => {
-    router.refresh()
+  const vehiclesQuery = useQuery<Vehicle[]>({
+    queryKey: ['vehicles'],
+    queryFn: getVehicles as any,
+  })
+
+  const driversQuery = useQuery<Driver[]>({
+    queryKey: ['drivers'],
+    queryFn: getDrivers as any,
+  })
+
+  const handleUpdate = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['routes'] })
+  }, [queryClient])
+
+  const isLoading = (routesQuery.isLoading && !routesQuery.data) ||
+    (vehiclesQuery.isLoading && !vehiclesQuery.data) ||
+    (driversQuery.isLoading && !driversQuery.data)
+
+  if (isLoading) {
+    return <TableSkeleton />
   }
 
-  return <RoutesTable routes={initialRoutes} vehicles={vehicles} drivers={drivers} onUpdate={handleUpdate} />
+  return (
+    <RoutesTable
+      routes={routesQuery.data ?? []}
+      vehicles={vehiclesQuery.data ?? []}
+      drivers={driversQuery.data ?? []}
+      onUpdate={handleUpdate}
+    />
+  )
 }
 

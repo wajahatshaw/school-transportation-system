@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
 import { Plus, Loader2, Car, CreditCard, Mail, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ interface AddDriverButtonProps {
 }
 
 export function AddDriverButton({ onSuccess }: AddDriverButtonProps) {
-  const router = useRouter()
+  const queryClient = useQueryClient()
   const [isOpen, setIsOpen] = useState(false)
   const [isSuccessOpen, setIsSuccessOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -92,7 +92,9 @@ export function AddDriverButton({ onSuccess }: AddDriverButtonProps) {
         if (onSuccess) {
           onSuccess()
         } else {
-          router.refresh()
+          queryClient.invalidateQueries({ queryKey: ['drivers'] })
+          // driver list can be used in routes & trip assignment dropdowns
+          queryClient.invalidateQueries({ queryKey: ['routes'] })
         }
       } catch (error) {
         toast.error('Failed to add driver', {

@@ -1,8 +1,5 @@
 import { Suspense } from 'react'
-import { getDrivers } from '@/lib/actions'
-import { DriversTable } from '@/components/DriversTable'
 import { AddDriverButton } from '@/components/AddDriverButton'
-import { TableSkeleton } from '@/components/ui/skeleton'
 import { DriversPageClient } from './drivers-page-client'
 
 export default async function DriversPage() {
@@ -16,14 +13,7 @@ export default async function DriversPage() {
         <AddDriverButton />
       </div>
 
-      <Suspense fallback={<TableSkeleton />}>
-        <DriversTableWrapper />
-      </Suspense>
+      <DriversPageClient />
     </div>
   )
-}
-
-async function DriversTableWrapper() {
-  const drivers = await getDrivers()
-  return <DriversPageClient initialDrivers={drivers} />
 }

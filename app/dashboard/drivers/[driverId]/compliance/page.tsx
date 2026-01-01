@@ -2,11 +2,10 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { getDriverById, getComplianceDocuments } from '@/lib/actions'
-import { ComplianceDocumentsTable } from '@/components/ComplianceDocumentsTable'
+import { getDriverById } from '@/lib/actions'
 import { AddComplianceDocumentButton } from '@/components/AddComplianceDocumentButton'
 import { Button } from '@/components/ui/button'
-import { TableSkeleton } from '@/components/ui/skeleton'
+import { ComplianceDocumentsClient } from './compliance-documents-client'
 
 export default async function DriverCompliancePage({
   params,
@@ -80,27 +79,12 @@ export default async function DriverCompliancePage({
 
         <div>
           <h2 className="text-xl font-semibold text-slate-900 mb-4">Compliance Documents</h2>
-          <Suspense fallback={<TableSkeleton rows={3} />}>
-            <ComplianceDocumentsTableWrapper driverId={driverId} />
-          </Suspense>
+          <ComplianceDocumentsClient driverId={driverId} />
         </div>
       </div>
     )
   } catch (error) {
     console.error('Error loading driver compliance page:', error)
     notFound()
-  }
-}
-
-async function ComplianceDocumentsTableWrapper({ driverId }: { driverId: string }) {
-  try {
-    if (!driverId || typeof driverId !== 'string') {
-      return null
-    }
-    const documents = await getComplianceDocuments(driverId)
-    return <ComplianceDocumentsTable documents={documents} driverId={driverId} />
-  } catch (error) {
-    console.error('Error loading compliance documents:', error)
-    return null
   }
 }
