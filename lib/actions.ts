@@ -20,10 +20,11 @@ export async function getStudents() {
       first_name: string
       last_name: string
       grade: string | null
+      route_id: string | null
       deleted_at: Date | null
       deleted_by: string | null
-      created_at: Date
-      updated_at: Date
+      created_at: Date | null
+      updated_at: Date | null
     }>>`
       SELECT * FROM app.v_students
       ORDER BY created_at DESC
@@ -36,6 +37,7 @@ export async function getStudents() {
       firstName: s.first_name,
       lastName: s.last_name,
       grade: s.grade,
+      routeId: s.route_id,
       deletedAt: s.deleted_at,
       deletedBy: s.deleted_by,
       createdAt: s.created_at,
