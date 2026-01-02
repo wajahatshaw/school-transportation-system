@@ -95,7 +95,7 @@ export function TopBar({ tenantName, userEmail, tenantId, onMenuClick }: TopBarP
             className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
             title="Switch organization"
           >
-            <RefreshCw className="h-4 w-4" />
+            {/* <RefreshCw className="h-4 w-4" /> */}
           </button>
 
           {/* User menu */}

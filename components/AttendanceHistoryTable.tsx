@@ -30,7 +30,17 @@ export function AttendanceHistoryTable({
   loading,
   onTripClick
 }: AttendanceHistoryTableProps) {
-  if (loading) {
+  // CRITICAL: NEVER show skeleton if we have trips data
+  // Even if loading is true, if we have cached data, show it!
+  const shouldShowSkeleton = loading && trips.length === 0
+  
+  console.log(`🏓 AttendanceHistoryTable:`, {
+    loading,
+    tripsCount: trips.length,
+    shouldShowSkeleton,
+  })
+  
+  if (shouldShowSkeleton) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
@@ -134,7 +144,7 @@ export function AttendanceHistoryTable({
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-slate-400" />
                     <span className="text-sm text-slate-900">
-                      {new Date(trip.tripDate).toLocaleDateString()}
+                      {formatDateUtc(trip.tripDate)}
                     </span>
                   </div>
                 </td>
@@ -186,5 +196,9 @@ export function AttendanceHistoryTable({
       </div>
     </div>
   )
+}
+
+function formatDateUtc(dateLike: Date) {
+  return new Date(dateLike).toLocaleDateString(undefined, { timeZone: 'UTC' })
 }
 

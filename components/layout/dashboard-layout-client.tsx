@@ -13,10 +13,11 @@ import {
   ScrollText,
   Settings as SettingsIcon
 } from 'lucide-react'
-import { NavLink } from '@/components/NavLink'
+import { InstantNavLink } from '@/components/InstantNavLink'
 import { Sidebar, TopBar } from '@/components/layout/header'
 import { ToastProvider } from '@/components/ui/toast'
 import { ReactQueryProvider } from '@/lib/react-query/provider'
+import { DataPrefetcher } from '@/components/DataPrefetcher'
 
 interface DashboardLayoutClientProps {
   children: React.ReactNode
@@ -35,8 +36,8 @@ export function DashboardLayoutClient({ children, tenantName, userEmail, tenantI
     { href: '/dashboard/drivers', label: 'Drivers', icon: Car },
     { href: '/dashboard/vehicles', label: 'Vehicles', icon: Bus },
     { href: '/dashboard/routes', label: 'Routes', icon: MapPin },
-    { href: '/dashboard/my-trips', label: 'My Trips', icon: Route },
-    { href: '/dashboard/attendance', label: 'Attendance', icon: ClipboardCheck },
+    { href: '/dashboard/operations?tab=trips', label: 'Trips', icon: Route },
+    { href: '/dashboard/operations?tab=attendance', label: 'Attendance', icon: ClipboardCheck },
     { href: '/dashboard/compliance', label: 'Compliance', icon: FileCheck },
     { href: '/dashboard/audit-logs', label: 'Audit Logs', icon: ScrollText },
     { href: '/dashboard/settings', label: 'Settings', icon: SettingsIcon },
@@ -44,11 +45,12 @@ export function DashboardLayoutClient({ children, tenantName, userEmail, tenantI
 
   const visibleNavItems =
     role === 'driver'
-      ? [{ href: '/dashboard/attendance', label: 'Attendance', icon: ClipboardCheck }]
+      ? [{ href: '/dashboard/operations?tab=attendance', label: 'Attendance', icon: ClipboardCheck }]
       : navItems
 
   return (
     <ReactQueryProvider>
+      <DataPrefetcher role={role} />
       <ToastProvider />
       <div className="min-h-screen bg-slate-50">
         <TopBar
@@ -66,10 +68,10 @@ export function DashboardLayoutClient({ children, tenantName, userEmail, tenantI
             {visibleNavItems.map((item) => {
               const Icon = item.icon
               return (
-                <NavLink key={item.href} href={item.href}>
+                <InstantNavLink key={item.href} href={item.href}>
                   <Icon className="h-5 w-5 flex-shrink-0" />
                   {!isSidebarCollapsed && <span>{item.label}</span>}
-                </NavLink>
+                </InstantNavLink>
               )
             })}
           </Sidebar>

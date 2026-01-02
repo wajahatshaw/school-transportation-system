@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { CheckCircle2, XCircle, MinusCircle } from 'lucide-react'
 import { markAttendance } from '@/lib/actions'
 import { toast } from 'sonner'
@@ -40,6 +40,11 @@ export function AttendanceMarker({
   const [isPending, startTransition] = useTransition()
   const [localStatus, setLocalStatus] = useState<AttendanceStatus>(currentStatus)
 
+  // Keep UI in sync with cached/updated props (e.g. React Query cache updates, navigation).
+  useEffect(() => {
+    setLocalStatus(currentStatus)
+  }, [currentStatus])
+
   const handleStatusChange = async (status: 'boarded' | 'absent' | 'no_show') => {
     if (isConfirmed) {
       toast.error('Cannot modify confirmed trip')
@@ -66,7 +71,7 @@ export function AttendanceMarker({
           onStatusChange({
             studentId: student.id,
             status,
-            markedAt: (updated as any)?.markedAt
+            markedAt: (updated as unknown as { markedAt?: string | Date } | null)?.markedAt
           })
         }
       } catch (error) {

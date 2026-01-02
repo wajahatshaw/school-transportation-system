@@ -20,7 +20,7 @@ export function MyTripsPageClient() {
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState({
     routeId: '',
-    tripDate: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+    tripDate: toUtcYyyyMmDd(new Date()), // YYYY-MM-DD (UTC, avoids timezone drift)
     routeType: 'AM' as RouteType,
     driverId: '',
   })
@@ -67,6 +67,14 @@ export function MyTripsPageClient() {
 
       return { activeTrips: activeTripsRaw, pastTrips: pastTripsRaw }
     },
+    // CRITICAL: Use cache immediately on mount if available
+    initialData: () => {
+      return queryClient.getQueryData(['my-trips', activeTab]) as any
+    },
+    initialDataUpdatedAt: () => {
+      return queryClient.getQueryState(['my-trips', activeTab])?.dataUpdatedAt
+    },
+    placeholderData: (previousData) => previousData,
   })
 
   const createTripMutation = useMutation({
@@ -74,10 +82,10 @@ export function MyTripsPageClient() {
       if (!createForm.routeId) throw new Error('Please select a route')
       if (!createForm.tripDate) throw new Error('Please select a date')
 
-      const tripDate = new Date(`${createForm.tripDate}T00:00:00`)
       return await createRouteTrip({
         routeId: createForm.routeId,
-        tripDate,
+        // Send date-only string to avoid timezone shifting when serialized.
+        tripDate: createForm.tripDate,
         routeType: createForm.routeType,
         driverId: createForm.driverId || undefined,
       })
@@ -99,24 +107,39 @@ export function MyTripsPageClient() {
   const openCreateModal = () => {
     setCreateForm({
       routeId: '',
-      tripDate: new Date().toISOString().slice(0, 10),
+      tripDate: toUtcYyyyMmDd(new Date()),
       routeType: activeTab,
       driverId: '',
     })
     setCreateOpen(true)
   }
 
-  const handleOpenTrip = (tripId: string) => {
-    // Trip execution happens in Attendance trip detail
-    router.push(`/dashboard/attendance/${tripId}`)
-  }
-
   const activeTrips = tripsQuery.data?.activeTrips ?? []
   const pastTrips = tripsQuery.data?.pastTrips ?? []
-  const loading = tripsQuery.isLoading && !tripsQuery.data
+  
+  // NEVER show loading if we have any data (cache exists)
+  // Only show loading on the very first load when genuinely no data
+  const hasAnyData = activeTrips.length > 0 || pastTrips.length > 0
+  const loading = tripsQuery.isPending && !hasAnyData
+  
   const creating = createTripMutation.isPending
   const routes = routesQuery.data ?? []
   const drivers = driversQuery.data ?? []
+
+  // Debug logging
+  console.log(`📊 My Trips State:`, {
+    tab: activeTab,
+    isPending: tripsQuery.isPending,
+    hasData: !!tripsQuery.data,
+    hasAnyData,
+    loading,
+    activeTripsCount: activeTrips.length,
+    pastTripsCount: pastTrips.length,
+  })
+
+  const handleOpenTrip = (tripId: string) => {
+    router.push(`/dashboard/attendance/${tripId}`)
+  }
 
   const routesForType = useMemo(() => {
     return routes.filter((r) => r.type === createForm.routeType)
@@ -205,7 +228,12 @@ export function MyTripsPageClient() {
                 <select
                   value={createForm.routeType}
                   onChange={(e) =>
-                    setCreateForm((p) => ({ ...p, routeType: e.target.value as RouteType, routeId: '' }))
+                    setCreateForm((p) => ({
+                      ...p,
+                      routeType: e.target.value as RouteType,
+                      routeId: '',
+                      driverId: '',
+                    }))
                   }
                 className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
                   disabled={creating}
@@ -231,7 +259,17 @@ export function MyTripsPageClient() {
               <label className="text-sm font-medium text-slate-700">Route</label>
               <select
                 value={createForm.routeId}
-                onChange={(e) => setCreateForm((p) => ({ ...p, routeId: e.target.value }))}
+                onChange={(e) => {
+                  const nextRouteId = e.target.value
+                  const selectedRoute = routesForType.find((r) => r.id === nextRouteId)
+                  setCreateForm((p) => ({
+                    ...p,
+                    routeId: nextRouteId,
+                    // Prefill driver with the one associated to the selected route.
+                    // User can still change it afterwards.
+                    driverId: selectedRoute?.driverId ?? '',
+                  }))
+                }}
                 className="flex h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2"
                 disabled={creating || routesQuery.isLoading}
               >
@@ -296,6 +334,13 @@ function toLocalYyyyMmDd(date: Date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function toUtcYyyyMmDd(date: Date) {
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(date.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
 

@@ -1647,7 +1647,8 @@ export async function getTodayTrips(routeType?: 'AM' | 'PM') {
 
 export async function createRouteTrip(data: {
   routeId: string
-  tripDate: Date
+  // Date-only field (Postgres DATE). Accept YYYY-MM-DD to avoid timezone drift.
+  tripDate: Date | string
   routeType: 'AM' | 'PM'
   driverId?: string
 }) {
@@ -1678,10 +1679,11 @@ export async function createRouteTrip(data: {
     }
     
     // Check if trip already exists
+    const normalizedTripDate = normalizeDateOnlyUtc(data.tripDate)
     const existing = await tx.routeTrip.findFirst({
       where: {
         routeId: data.routeId,
-        tripDate: data.tripDate,
+        tripDate: normalizedTripDate,
         routeType: data.routeType
       }
     })
@@ -1694,7 +1696,7 @@ export async function createRouteTrip(data: {
       data: {
         tenantId: context.tenantId,
         routeId: data.routeId,
-        tripDate: data.tripDate,
+        tripDate: normalizedTripDate,
         routeType: data.routeType,
         driverId: data.driverId || route.driverId
       }
@@ -1706,6 +1708,33 @@ export async function createRouteTrip(data: {
     
     return trip
   })
+}
+
+function normalizeDateOnlyUtc(input: Date | string): Date {
+  if (input instanceof Date) {
+    const y = input.getUTCFullYear()
+    const m = input.getUTCMonth()
+    const d = input.getUTCDate()
+    return new Date(Date.UTC(y, m, d))
+  }
+
+  // Expect YYYY-MM-DD
+  const s = String(input).trim()
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  if (!match) {
+    // Fallback: try native parsing, but normalize to UTC date-only to avoid shifts.
+    const parsed = new Date(s)
+    if (Number.isNaN(parsed.getTime())) throw new Error('Invalid tripDate (expected YYYY-MM-DD)')
+    const y = parsed.getUTCFullYear()
+    const m = parsed.getUTCMonth()
+    const d = parsed.getUTCDate()
+    return new Date(Date.UTC(y, m, d))
+  }
+
+  const y = Number(match[1])
+  const m = Number(match[2]) - 1
+  const d = Number(match[3])
+  return new Date(Date.UTC(y, m, d))
 }
 
 export async function confirmTrip(tripId: string) {

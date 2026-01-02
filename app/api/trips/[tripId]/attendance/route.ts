@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { tripId: string } }
+  context: { params: Promise<{ tripId: string }> }
 ) {
   try {
     // Validate authentication and tenant selection
@@ -27,7 +27,7 @@ export async function GET(
       )
     }
 
-    const tripId = params.tripId
+    const { tripId } = await context.params
 
     const attendance = await getTripAttendance(tripId)
 
@@ -41,7 +41,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { tripId: string } }
+  context: { params: Promise<{ tripId: string }> }
 ) {
   try {
     // Validate authentication and tenant selection
@@ -84,7 +84,7 @@ export async function POST(
       )
     }
 
-    const tripId = params.tripId
+    const { tripId } = await context.params
     const { action, studentId, status } = body
 
     if (!studentId) {

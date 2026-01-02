@@ -112,7 +112,8 @@ export async function POST(request: NextRequest) {
 
     const trip = await createRouteTrip({
       routeId: String(routeId).trim(),
-      tripDate: new Date(tripDate),
+      // Pass date-only string through; lib/actions normalizes to UTC date-only.
+      tripDate: String(tripDate).trim(),
       routeType: routeType as 'AM' | 'PM',
       driverId: driverId ? String(driverId).trim() : undefined
     })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Calendar, MapPin, User, UserPlus, UserMinus } from 'lucide-react'
 import { getTripById, getTripAttendance, getStudents, addStudentToTrip, removeStudentFromTrip } from '@/lib/actions'
@@ -9,6 +9,35 @@ import { Badge } from '@/components/ui/badge'
 import { AttendanceMarker } from '@/components/AttendanceMarker'
 import { TripConfirmButton } from '@/components/TripConfirmButton'
 import { toast } from 'sonner'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/react-query/keys'
+
+type AttendanceStatus = 'boarded' | 'absent' | 'no_show'
+
+interface Student {
+  id: string
+  firstName: string
+  lastName: string
+  grade?: string | null
+  deletedAt?: string | Date | null
+}
+
+interface AttendanceRecord {
+  id: string
+  studentId: string
+  status: AttendanceStatus
+  markedAt?: string | Date
+  student: Student | null
+}
+
+interface Trip {
+  id: string
+  tripDate: string | Date
+  routeType: string
+  confirmedAt: string | Date | null
+  route?: { name?: string | null } | null
+  driver?: { firstName: string; lastName: string } | null
+}
 
 interface TripDetailPageClientProps {
   tripId: string
@@ -16,41 +45,75 @@ interface TripDetailPageClientProps {
 
 export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
   const router = useRouter()
-  const [trip, setTrip] = useState<any>(null)
-  const [attendance, setAttendance] = useState<any[]>([])
-  const [allStudents, setAllStudents] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const tripNotFoundHandledRef = useRef(false)
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<string>('')
 
-  useEffect(() => {
-    loadData()
-  }, [tripId])
+  const tripQuery = useQuery<Trip | null>({
+    queryKey: queryKeys.trip(tripId),
+    queryFn: async () => (await getTripById(tripId)) as unknown as Trip | null,
+    enabled: !!tripId,
+    placeholderData: (previousData) => previousData, // Show cached data immediately
+  })
 
-  const loadData = async () => {
-    try {
-      setLoading(true)
-      const [tripData, attendanceData, studentsData] = await Promise.all([
-        getTripById(tripId),
-        getTripAttendance(tripId),
-        getStudents()
-      ])
-      
-      if (!tripData) {
+  const attendanceQuery = useQuery<AttendanceRecord[]>({
+    queryKey: queryKeys.tripAttendance(tripId),
+    queryFn: async () => (await getTripAttendance(tripId)) as unknown as AttendanceRecord[],
+    enabled: !!tripId,
+    placeholderData: (previousData) => previousData, // Show cached data immediately
+  })
+
+  const studentsQuery = useQuery<Student[]>({
+    queryKey: queryKeys.students(),
+    queryFn: async () => (await getStudents()) as unknown as Student[],
+    placeholderData: (previousData) => previousData, // Show cached data immediately
+  })
+
+  useEffect(() => {
+    if (tripNotFoundHandledRef.current) return
+    if (!tripQuery.isSuccess) return
+    if (tripQuery.data) return
+
+    tripNotFoundHandledRef.current = true
         toast.error('Trip not found')
         router.push('/dashboard/my-trips')
-        return
-      }
-      
-      setTrip(tripData)
-      setAttendance(attendanceData)
-      setAllStudents(studentsData)
-    } catch (error) {
-      toast.error('Failed to load trip details')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [router, tripQuery.data, tripQuery.isSuccess])
+
+  const addStudentMutation = useMutation({
+    mutationFn: async (studentId: string) => addStudentToTrip(tripId, studentId),
+    onSuccess: (created) => {
+      toast.success('Student added to trip')
+      setShowAddStudent(false)
+      setSelectedStudent('')
+      queryClient.setQueryData<AttendanceRecord[] | undefined>(queryKeys.tripAttendance(tripId), (prev) => {
+        if (!prev) return prev
+        // Server action returns AttendanceRecord with student included.
+        return [...prev, created as unknown as AttendanceRecord]
+      })
+    },
+    onError: (error) => {
+      toast.error('Failed to add student', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      })
+    },
+  })
+
+  const removeStudentMutation = useMutation({
+    mutationFn: async (studentId: string) => removeStudentFromTrip(tripId, studentId),
+    onSuccess: (_res, studentId) => {
+      toast.success('Student removed from trip')
+      queryClient.setQueryData<AttendanceRecord[] | undefined>(queryKeys.tripAttendance(tripId), (prev) => {
+        if (!prev) return prev
+        return prev.filter((r) => r.studentId !== studentId)
+      })
+    },
+    onError: (error) => {
+      toast.error('Failed to remove student', {
+        description: error instanceof Error ? error.message : 'Please try again',
+      })
+    },
+  })
 
   const handleAddStudent = async () => {
     if (!selectedStudent) {
@@ -58,17 +121,7 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
       return
     }
 
-    try {
-      await addStudentToTrip(tripId, selectedStudent)
-      toast.success('Student added to trip')
-      setShowAddStudent(false)
-      setSelectedStudent('')
-      loadData()
-    } catch (error) {
-      toast.error('Failed to add student', {
-        description: error instanceof Error ? error.message : 'Please try again'
-      })
-    }
+    addStudentMutation.mutate(selectedStudent)
   }
 
   const handleRemoveStudent = async (studentId: string, studentName: string) => {
@@ -76,16 +129,24 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
       return
     }
 
-    try {
-      await removeStudentFromTrip(tripId, studentId)
-      toast.success('Student removed from trip')
-      loadData()
-    } catch (error) {
-      toast.error('Failed to remove student', {
-        description: error instanceof Error ? error.message : 'Please try again'
-      })
-    }
+    removeStudentMutation.mutate(studentId)
   }
+
+  // Only show loading when there's NO cached data yet (first load).
+  // If cache exists, render immediately with cached data.
+  const loading =
+    (tripQuery.isPending && !tripQuery.data) ||
+    (attendanceQuery.isPending && !attendanceQuery.data) ||
+    (studentsQuery.isPending && !studentsQuery.data)
+
+  const trip = tripQuery.data
+  const attendance = useMemo(() => attendanceQuery.data ?? [], [attendanceQuery.data])
+  const allStudents = useMemo(() => studentsQuery.data ?? [], [studentsQuery.data])
+  const attendanceMap = useMemo(() => new Map(attendance.map((a) => [a.studentId, a])), [attendance])
+  const studentsNotOnTrip = useMemo(
+    () => allStudents.filter((s) => !attendanceMap.has(s.id) && !s.deletedAt),
+    [allStudents, attendanceMap]
+  )
 
   if (loading) {
     return <div className="text-center py-12">Loading...</div>
@@ -94,8 +155,6 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
   if (!trip) {
     return null
   }
-
-  const attendanceMap = new Map(attendance.map(a => [a.studentId, a]))
   
   const stats = {
     boarded: attendance.filter(a => a.status === 'boarded').length,
@@ -103,10 +162,6 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
     noShow: attendance.filter(a => a.status === 'no_show').length,
     total: attendance.length
   }
-
-  const studentsNotOnTrip = allStudents.filter(
-    s => !attendanceMap.has(s.id) && !s.deletedAt
-  )
 
   return (
     <div className="space-y-6">
@@ -118,7 +173,7 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
           onClick={() => router.push('/dashboard/my-trips')}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to My Trips
+          Back to Trips
         </Button>
       </div>
 
@@ -132,7 +187,7 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
             <div className="flex items-center gap-4 text-sm text-slate-600">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                <span>{new Date(trip.tripDate).toLocaleDateString()}</span>
+                <span>{formatDateUtc(trip.tripDate)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
@@ -179,6 +234,7 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
                 value={selectedStudent}
                 onChange={(e) => setSelectedStudent(e.target.value)}
                 className="flex-1 px-3 py-2 border border-slate-300 rounded-md text-sm"
+                disabled={addStudentMutation.isPending}
               >
                 <option value="">Select a student...</option>
                 {studentsNotOnTrip.map((student) => (
@@ -187,7 +243,7 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
                   </option>
                 ))}
               </select>
-              <Button onClick={handleAddStudent} size="sm">
+              <Button onClick={handleAddStudent} size="sm" disabled={addStudentMutation.isPending || !selectedStudent}>
                 Add
               </Button>
               <Button
@@ -197,6 +253,7 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
                 }}
                 variant="outline"
                 size="sm"
+                disabled={addStudentMutation.isPending}
               >
                 Cancel
               </Button>
@@ -220,27 +277,38 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
         ) : (
           <div className="space-y-3">
             {attendance.map((record) => {
-              if (!record.student) return null
+              const student = record.student
+              if (!student) return null
               
               return (
                 <div key={record.id} className="relative">
                   <AttendanceMarker
                     tripId={tripId}
-                    student={record.student}
-                    currentStatus={record.status}
+                    student={student}
+                    currentStatus={record.status as AttendanceStatus}
                     isConfirmed={!!trip.confirmedAt}
-                    onStatusChange={loadData}
+                    onStatusChange={({ studentId, status, markedAt }) => {
+                      queryClient.setQueryData<AttendanceRecord[] | undefined>(queryKeys.tripAttendance(tripId), (prev) => {
+                        if (!prev) return prev
+                        return prev.map((r) =>
+                          r.studentId === studentId
+                            ? { ...r, status, markedAt: markedAt ? new Date(markedAt) : r.markedAt }
+                            : r
+                        )
+                      })
+                    }}
                   />
                   
                   {!trip.confirmedAt && (
                     <Button
                       onClick={() => handleRemoveStudent(
                         record.studentId,
-                        `${record.student.firstName} ${record.student.lastName}`
+                        `${student.firstName} ${student.lastName}`
                       )}
                       variant="ghost"
                       size="sm"
                       className="absolute top-2 right-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      disabled={removeStudentMutation.isPending}
                     >
                       <UserMinus className="h-4 w-4" />
                     </Button>
@@ -257,9 +325,21 @@ export function TripDetailPageClient({ tripId }: TripDetailPageClientProps) {
         tripId={tripId}
         isConfirmed={!!trip.confirmedAt}
         stats={stats}
-        onConfirmed={loadData}
+        disabled={addStudentMutation.isPending || removeStudentMutation.isPending}
+        disabledReason={
+          addStudentMutation.isPending || removeStudentMutation.isPending ? 'Please wait for changes to finish saving.' : undefined
+        }
+        onConfirmed={() => {
+          queryClient.setQueryData<Trip | null | undefined>(queryKeys.trip(tripId), (prev) =>
+            prev ? { ...prev, confirmedAt: new Date().toISOString() } : prev
+          )
+        }}
       />
     </div>
   )
+}
+
+function formatDateUtc(dateLike: string | number | Date) {
+  return new Date(dateLike).toLocaleDateString(undefined, { timeZone: 'UTC' })
 }
 

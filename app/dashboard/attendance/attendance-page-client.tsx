@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button'
 import { AttendanceHistoryTable } from '@/components/AttendanceHistoryTable'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 export function AttendancePageClient({ role }: { role: string }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const isDriver = role === 'driver'
   
   // Filters
@@ -49,6 +50,7 @@ export function AttendancePageClient({ role }: { role: string }) {
   const tripsQuery = useQuery({
     queryKey: ['attendance-trips', isDriver ? 'driver' : 'admin', applied],
     queryFn: async () => {
+      console.log(`🔄 Fetching attendance trips (${isDriver ? 'driver' : 'admin'})...`)
       const filters: any = isDriver
         ? (() => {
             const today = new Date()
@@ -73,8 +75,42 @@ export function AttendancePageClient({ role }: { role: string }) {
         if (applied.routeType) filters.routeType = applied.routeType
       }
 
-      return await getRouteTrips(filters)
+      const result = await getRouteTrips(filters)
+      console.log(`✅ Attendance trips loaded:`, result.length)
+      return result
     },
+    // CRITICAL: Use cache immediately on mount if available
+    initialData: () => {
+      return queryClient.getQueryData(['attendance-trips', isDriver ? 'driver' : 'admin', applied]) as any
+    },
+    initialDataUpdatedAt: () => {
+      return queryClient.getQueryState(['attendance-trips', isDriver ? 'driver' : 'admin', applied])?.dataUpdatedAt
+    },
+    placeholderData: (previousData) => {
+      if (previousData) {
+        console.log(`⚡️ Using cached attendance data`)
+      }
+      return previousData
+    },
+  })
+
+  const trips = tripsQuery.data ?? []
+  const hasAnyData = trips.length > 0
+  
+  // Show loading when fetching (filters applied)
+  // But NOT on initial mount with cached data
+  const isFiltering = tripsQuery.isFetching && hasAnyData
+  const loading = (tripsQuery.isPending && !hasAnyData) || isFiltering
+
+  console.log(`📊 Attendance Query State:`, {
+    isDriver,
+    isPending: tripsQuery.isPending,
+    isFetching: tripsQuery.isFetching,
+    hasData: !!tripsQuery.data,
+    hasAnyData,
+    isFiltering,
+    loading,
+    tripsCount: trips.length,
   })
 
   const handleTripClick = (tripId: string) => {
@@ -241,11 +277,11 @@ export function AttendancePageClient({ role }: { role: string }) {
               })
             }}
             size="sm"
-            disabled={tripsQuery.isFetching}
+            disabled={tripsQuery.isPending}
           >
-            {tripsQuery.isFetching ? 'Loading…' : 'Apply Filters'}
+            {tripsQuery.isPending ? 'Loading…' : 'Apply Filters'}
           </Button>
-          <Button onClick={handleClearFilters} variant="outline" size="sm" disabled={tripsQuery.isFetching}>
+          <Button onClick={handleClearFilters} variant="outline" size="sm" disabled={tripsQuery.isPending}>
             Clear Filters
           </Button>
           <div className="ml-auto text-xs text-slate-500 flex items-center">
@@ -260,14 +296,14 @@ export function AttendancePageClient({ role }: { role: string }) {
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-slate-600">
-          {tripsQuery.isFetching ? 'Loading...' : `Found ${(tripsQuery.data ?? []).length} trip(s)`}
+          {loading ? 'Loading...' : `Found ${trips.length} trip(s)`}
         </div>
       </div>
 
       {/* Trips Table (Admin) / Mobile cards (Driver) */}
       {isDriver ? (
         <div className="space-y-3">
-          {tripsQuery.isFetching && !(tripsQuery.data && tripsQuery.data.length > 0) && (
+          {loading && (
             <>
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="rounded-lg border border-slate-200 bg-white p-4">
@@ -284,14 +320,12 @@ export function AttendancePageClient({ role }: { role: string }) {
             </>
           )}
 
-          {(tripsQuery.data ?? []).map((trip) => {
+          {trips.map((trip: any) => {
             const tripDate = new Date(trip.tripDate)
-            const today = new Date()
-            today.setHours(0, 0, 0, 0)
-            const d = new Date(tripDate)
-            d.setHours(0, 0, 0, 0)
-            const isToday = d.getTime() === today.getTime()
-            const isPast = d.getTime() < today.getTime()
+            const tripYmd = toUtcYyyyMmDd(tripDate)
+            const todayYmd = toUtcYyyyMmDd(new Date())
+            const isToday = tripYmd === todayYmd
+            const isPast = tripYmd < todayYmd
             const isConfirmed = !!trip.confirmedAt
             const isDisabled = isConfirmed
             return (
@@ -311,7 +345,7 @@ export function AttendancePageClient({ role }: { role: string }) {
                       {trip.route?.name || 'Unknown Route'} • {trip.routeType}
                     </div>
                     <div className="text-xs text-slate-600 mt-1">
-                      {tripDate.toLocaleDateString()}
+                      {tripDate.toLocaleDateString(undefined, { timeZone: 'UTC' })}
                     </div>
                   </div>
                   <div className="text-xs">
@@ -346,11 +380,11 @@ export function AttendancePageClient({ role }: { role: string }) {
           })}
         </div>
       ) : (
-      <AttendanceHistoryTable
-        trips={tripsQuery.data ?? []}
-        loading={tripsQuery.isFetching && !tripsQuery.data}
-        onTripClick={handleTripClick}
-      />
+        <AttendanceHistoryTable
+          trips={trips}
+          loading={loading}
+          onTripClick={handleTripClick}
+        />
       )}
     </div>
   )
@@ -360,6 +394,13 @@ function toLocalYyyyMmDd(date: Date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function toUtcYyyyMmDd(date: Date) {
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const d = String(date.getUTCDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
 

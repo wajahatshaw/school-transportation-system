@@ -12,7 +12,10 @@ export function StudentsPageClient() {
 
   const studentsQuery = useQuery<Student[]>({
     queryKey: ['students'],
-    queryFn: getStudents,
+    queryFn: async () => {
+      const data = await getStudents()
+      return data as unknown as Student[]
+    },
   })
 
   const handleUpdate = useCallback(() => {
