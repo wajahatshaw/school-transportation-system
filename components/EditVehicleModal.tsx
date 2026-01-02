@@ -22,8 +22,8 @@ type Vehicle = {
   vehicleType: string | null
   deletedAt: Date | null
   deletedBy: string | null
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | null
+  updatedAt: Date | null
 }
 
 interface EditVehicleModalProps {
