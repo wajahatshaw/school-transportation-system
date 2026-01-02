@@ -33,8 +33,21 @@ export function InstantNavLink({ href, children, className }: InstantNavLinkProp
   let isActive = false
   
   if (hrefQueryString) {
-    // Has query params - must match exact URL
-    isActive = currentFullUrl === href
+    // Has query params - must match exact URL OR be on a child route
+    isActive = currentFullUrl === href || 
+               (pathname.startsWith(hrefPath) && pathname !== hrefPath)
+    
+    // Special handling for /dashboard/operations?tab=attendance
+    // Should stay active when on /dashboard/attendance/[tripId]
+    if (hrefPath === '/dashboard/operations' && hrefParams.get('tab') === 'attendance') {
+      isActive = isActive || pathname.startsWith('/dashboard/attendance')
+    }
+    
+    // Special handling for /dashboard/operations?tab=trips
+    // Should stay active when on /dashboard/my-trips/[tripId]
+    if (hrefPath === '/dashboard/operations' && hrefParams.get('tab') === 'trips') {
+      isActive = isActive || pathname.startsWith('/dashboard/my-trips')
+    }
   } else {
     // No query params - check path
     isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href))

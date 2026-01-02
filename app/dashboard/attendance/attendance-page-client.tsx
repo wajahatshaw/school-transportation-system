@@ -296,7 +296,11 @@ export function AttendancePageClient({ role }: { role: string }) {
       {/* Results Summary */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-slate-600">
-          {loading ? 'Loading...' : `Found ${trips.length} trip(s)`}
+          {loading ? (
+            <Skeleton className="h-4 w-32" />
+          ) : (
+            `Found ${trips.length} trip(s)`
+          )}
         </div>
       </div>
 

@@ -20,7 +20,7 @@ export function OperationsPageClient({ role }: OperationsPageClientProps) {
     if (tabFromUrl && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl)
     }
-  }, [tabFromUrl])
+  }, [tabFromUrl, activeTab])
 
   const handleTabChange = (tab: 'trips' | 'attendance') => {
     setActiveTab(tab)
