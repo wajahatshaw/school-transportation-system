@@ -33,7 +33,18 @@ export async function POST(request: NextRequest) {
 
     // Parse request body with proper error handling for Netlify compatibility
     // Use text() then parse manually - more reliable on Netlify than request.json()
-    let body: { firstName?: string; lastName?: string; grade?: string }
+    let body: {
+      firstName?: string
+      lastName?: string
+      grade?: string
+      studentAddress?: string
+      pickupAddress?: string
+      guardianName?: string
+      guardianPhone?: string
+      schoolName?: string
+      schoolAddress?: string
+      schoolPhone?: string
+    }
     try {
       const text = await request.text()
       if (!text || text.trim() === '') {
@@ -58,7 +69,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { firstName, lastName, grade } = body
+    const {
+      firstName,
+      lastName,
+      grade,
+      studentAddress,
+      pickupAddress,
+      guardianName,
+      guardianPhone,
+      schoolName,
+      schoolAddress,
+      schoolPhone,
+    } = body
 
     if (!firstName || !lastName) {
       return NextResponse.json(
@@ -71,6 +93,13 @@ export async function POST(request: NextRequest) {
       firstName: String(firstName).trim(),
       lastName: String(lastName).trim(),
       grade: grade ? String(grade).trim() : undefined,
+      studentAddress: studentAddress ? String(studentAddress).trim() : undefined,
+      pickupAddress: pickupAddress ? String(pickupAddress).trim() : undefined,
+      guardianName: guardianName ? String(guardianName).trim() : undefined,
+      guardianPhone: guardianPhone ? String(guardianPhone).trim() : undefined,
+      schoolName: schoolName ? String(schoolName).trim() : undefined,
+      schoolAddress: schoolAddress ? String(schoolAddress).trim() : undefined,
+      schoolPhone: schoolPhone ? String(schoolPhone).trim() : undefined,
     })
 
     return NextResponse.json(student, { status: 201 })

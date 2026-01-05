@@ -25,7 +25,18 @@ export function StudentsTable({ students, onUpdate }: StudentsTableProps) {
     setEditingStudent(student)
   }
 
-  const handleUpdate = async (data: { firstName: string; lastName: string; grade?: string }) => {
+  const handleUpdate = async (data: {
+    firstName: string
+    lastName: string
+    grade?: string
+    studentAddress?: string | null
+    pickupAddress?: string | null
+    guardianName?: string | null
+    guardianPhone?: string | null
+    schoolName?: string | null
+    schoolAddress?: string | null
+    schoolPhone?: string | null
+  }) => {
     if (!editingStudent) return
 
     setEditingStudent(null)

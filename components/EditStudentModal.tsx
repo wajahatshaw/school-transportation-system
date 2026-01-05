@@ -12,11 +12,23 @@ import {
 } from '@/components/ui/dialog'
 import { Input, Label } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { formatUsPhoneInput, validateUsPhone } from '@/lib/phone'
 
 interface EditStudentModalProps {
   student: Student
   onClose: () => void
-  onSave: (data: { firstName: string; lastName: string; grade?: string }) => Promise<void>
+  onSave: (data: {
+    firstName: string
+    lastName: string
+    grade?: string
+    studentAddress?: string | null
+    pickupAddress?: string | null
+    guardianName?: string | null
+    guardianPhone?: string | null
+    schoolName?: string | null
+    schoolAddress?: string | null
+    schoolPhone?: string | null
+  }) => Promise<void>
 }
 
 export function EditStudentModal({ student, onClose, onSave }: EditStudentModalProps) {
@@ -25,6 +37,13 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
     firstName: student.firstName,
     lastName: student.lastName,
     grade: student.grade || '',
+    studentAddress: (student as any).studentAddress || '',
+    pickupAddress: (student as any).pickupAddress || '',
+    guardianName: (student as any).guardianName || '',
+    guardianPhone: (student as any).guardianPhone || '',
+    schoolName: (student as any).schoolName || '',
+    schoolAddress: (student as any).schoolAddress || '',
+    schoolPhone: (student as any).schoolPhone || '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -37,6 +56,12 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
     if (!formData.lastName.trim()) {
       newErrors.lastName = 'Last name is required'
     }
+
+    const guardianPhoneCheck = validateUsPhone(formData.guardianPhone)
+    if (!guardianPhoneCheck.ok) newErrors.guardianPhone = guardianPhoneCheck.error
+
+    const schoolPhoneCheck = validateUsPhone(formData.schoolPhone)
+    if (!schoolPhoneCheck.ok) newErrors.schoolPhone = schoolPhoneCheck.error
     
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -48,10 +73,20 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
     if (!validateForm()) return
 
     startTransition(async () => {
+      const guardianPhoneCheck = validateUsPhone(formData.guardianPhone)
+      const schoolPhoneCheck = validateUsPhone(formData.schoolPhone)
+
       await onSave({
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         grade: formData.grade.trim() || undefined,
+        studentAddress: formData.studentAddress.trim() || null,
+        pickupAddress: formData.pickupAddress.trim() || null,
+        guardianName: formData.guardianName.trim() || null,
+        guardianPhone: guardianPhoneCheck.ok ? (guardianPhoneCheck.e164 || null) : null,
+        schoolName: formData.schoolName.trim() || null,
+        schoolAddress: formData.schoolAddress.trim() || null,
+        schoolPhone: schoolPhoneCheck.ok ? (schoolPhoneCheck.e164 || null) : null,
       })
     })
   }
@@ -63,11 +98,22 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
     }
   }
 
+  const handlePhoneChange = (field: 'guardianPhone' | 'schoolPhone', value: string) => {
+    const formatted = formatUsPhoneInput(value)
+    setFormData((prev) => ({ ...prev, [field]: formatted.display }))
+
+    const res = validateUsPhone(formatted.display)
+    setErrors((prev) => ({
+      ...prev,
+      [field]: res.ok ? '' : res.error,
+    }))
+  }
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent 
         onClose={onClose}
-        className="sm:max-w-[500px]"
+        className="w-[92vw] max-w-[980px]"
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -84,7 +130,7 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* First Name */}
             <div className="space-y-2">
               <Label htmlFor="firstName" className="text-sm font-medium text-slate-700">
@@ -138,7 +184,117 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
                   className="pl-10"
                 />
               </div>
-              <p className="text-xs text-slate-500">Optional: Specify the student's grade level</p>
+              <p className="text-xs text-slate-500">Optional</p>
+            </div>
+
+            {/* Guardian Phone */}
+            <div className="space-y-2">
+              <Label htmlFor="guardianPhone" className="text-sm font-medium text-slate-700">
+                Parent/Guardian Phone
+              </Label>
+              <Input
+                id="guardianPhone"
+                value={formData.guardianPhone}
+                onChange={(e) => handlePhoneChange('guardianPhone', e.target.value)}
+                placeholder="+1 (248) 555-1212"
+                disabled={isPending}
+                inputMode="tel"
+                autoComplete="tel"
+                className={errors.guardianPhone ? 'border-red-500 focus-visible:ring-red-500' : ''}
+              />
+              {errors.guardianPhone && (
+                <p className="text-sm text-red-600">{errors.guardianPhone}</p>
+              )}
+            </div>
+
+            {/* Guardian Name */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="guardianName" className="text-sm font-medium text-slate-700">
+                Parent/Guardian Name
+              </Label>
+              <Input
+                id="guardianName"
+                value={formData.guardianName}
+                onChange={(e) => handleChange('guardianName', e.target.value)}
+                placeholder="Parent/guardian full name"
+                disabled={isPending}
+              />
+            </div>
+
+            {/* Student Address */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="studentAddress" className="text-sm font-medium text-slate-700">
+                Student Address
+              </Label>
+              <Input
+                id="studentAddress"
+                value={formData.studentAddress}
+                onChange={(e) => handleChange('studentAddress', e.target.value)}
+                placeholder="Home address"
+                disabled={isPending}
+              />
+            </div>
+
+            {/* Pick-up Address */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="pickupAddress" className="text-sm font-medium text-slate-700">
+                Pick-up Address
+              </Label>
+              <Input
+                id="pickupAddress"
+                value={formData.pickupAddress}
+                onChange={(e) => handleChange('pickupAddress', e.target.value)}
+                placeholder="Pick-up location (if different)"
+                disabled={isPending}
+              />
+            </div>
+
+            {/* School Name */}
+            <div className="space-y-2">
+              <Label htmlFor="schoolName" className="text-sm font-medium text-slate-700">
+                School Name
+              </Label>
+              <Input
+                id="schoolName"
+                value={formData.schoolName}
+                onChange={(e) => handleChange('schoolName', e.target.value)}
+                placeholder="School name"
+                disabled={isPending}
+              />
+            </div>
+
+            {/* School Phone */}
+            <div className="space-y-2">
+              <Label htmlFor="schoolPhone" className="text-sm font-medium text-slate-700">
+                School Phone
+              </Label>
+              <Input
+                id="schoolPhone"
+                value={formData.schoolPhone}
+                onChange={(e) => handlePhoneChange('schoolPhone', e.target.value)}
+                placeholder="+1 (248) 555-1212"
+                disabled={isPending}
+                inputMode="tel"
+                autoComplete="tel"
+                className={errors.schoolPhone ? 'border-red-500 focus-visible:ring-red-500' : ''}
+              />
+              {errors.schoolPhone && (
+                <p className="text-sm text-red-600">{errors.schoolPhone}</p>
+              )}
+            </div>
+
+            {/* School Address */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="schoolAddress" className="text-sm font-medium text-slate-700">
+                School Address
+              </Label>
+              <Input
+                id="schoolAddress"
+                value={formData.schoolAddress}
+                onChange={(e) => handleChange('schoolAddress', e.target.value)}
+                placeholder="School address"
+                disabled={isPending}
+              />
             </div>
           </div>
 

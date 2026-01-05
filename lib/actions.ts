@@ -20,6 +20,13 @@ export async function getStudents() {
       first_name: string
       last_name: string
       grade: string | null
+      student_address: string | null
+      pickup_address: string | null
+      guardian_name: string | null
+      guardian_phone: string | null
+      school_name: string | null
+      school_address: string | null
+      school_phone: string | null
       route_id: string | null
       deleted_at: Date | null
       deleted_by: string | null
@@ -37,6 +44,13 @@ export async function getStudents() {
       firstName: s.first_name,
       lastName: s.last_name,
       grade: s.grade,
+      studentAddress: s.student_address,
+      pickupAddress: s.pickup_address,
+      guardianName: s.guardian_name,
+      guardianPhone: s.guardian_phone,
+      schoolName: s.school_name,
+      schoolAddress: s.school_address,
+      schoolPhone: s.school_phone,
       routeId: s.route_id,
       deletedAt: s.deleted_at,
       deletedBy: s.deleted_by,
@@ -46,7 +60,18 @@ export async function getStudents() {
   })
 }
 
-export async function createStudent(data: { firstName: string; lastName: string; grade?: string }) {
+export async function createStudent(data: {
+  firstName: string
+  lastName: string
+  grade?: string
+  studentAddress?: string
+  pickupAddress?: string
+  guardianName?: string
+  guardianPhone?: string
+  schoolName?: string
+  schoolAddress?: string
+  schoolPhone?: string
+}) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
@@ -55,7 +80,14 @@ export async function createStudent(data: { firstName: string; lastName: string;
         tenantId: context.tenantId,
         firstName: data.firstName,
         lastName: data.lastName,
-        grade: data.grade
+        grade: data.grade,
+        studentAddress: data.studentAddress,
+        pickupAddress: data.pickupAddress,
+        guardianName: data.guardianName,
+        guardianPhone: data.guardianPhone,
+        schoolName: data.schoolName,
+        schoolAddress: data.schoolAddress,
+        schoolPhone: data.schoolPhone,
       }
     })
     
@@ -68,7 +100,21 @@ export async function createStudent(data: { firstName: string; lastName: string;
   })
 }
 
-export async function updateStudent(id: string, data: { firstName: string; lastName: string; grade?: string }) {
+export async function updateStudent(
+  id: string,
+  data: {
+    firstName: string
+    lastName: string
+    grade?: string
+    studentAddress?: string | null
+    pickupAddress?: string | null
+    guardianName?: string | null
+    guardianPhone?: string | null
+    schoolName?: string | null
+    schoolAddress?: string | null
+    schoolPhone?: string | null
+  }
+) {
   const context = await getTenantContext()
   
   return await withTenantContext(context, async (tx) => {
@@ -86,7 +132,14 @@ export async function updateStudent(id: string, data: { firstName: string; lastN
       data: {
         firstName: data.firstName,
         lastName: data.lastName,
-        grade: data.grade
+        grade: data.grade,
+        studentAddress: data.studentAddress === undefined ? undefined : data.studentAddress,
+        pickupAddress: data.pickupAddress === undefined ? undefined : data.pickupAddress,
+        guardianName: data.guardianName === undefined ? undefined : data.guardianName,
+        guardianPhone: data.guardianPhone === undefined ? undefined : data.guardianPhone,
+        schoolName: data.schoolName === undefined ? undefined : data.schoolName,
+        schoolAddress: data.schoolAddress === undefined ? undefined : data.schoolAddress,
+        schoolPhone: data.schoolPhone === undefined ? undefined : data.schoolPhone,
       }
     })
     
