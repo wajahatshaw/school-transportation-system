@@ -11,6 +11,8 @@ type Vehicle = {
   capacity: number
   licensePlate: string | null
   vehicleType: string | null
+  manufactureYear: number | null
+  model: string | null
   deletedAt: Date | null
   deletedBy: string | null
   createdAt: Date | null

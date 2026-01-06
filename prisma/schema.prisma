@@ -140,6 +140,8 @@ model Vehicle {
   capacity      Int
   licensePlate  String?   @map("license_plate")
   vehicleType   String?   @map("vehicle_type")
+  manufactureYear Int?   @map("manufacture_year")
+  model         String?
   deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
   deletedBy     String?   @map("deleted_by") @db.Uuid
   createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -147,8 +149,27 @@ model Vehicle {
 
   tenant        Tenant    @relation(fields: [tenantId], references: [id])
   routes        Route[]
+  maintenances  VehicleMaintenanceDoc[]
 
   @@map("vehicles")
+}
+
+model VehicleMaintenanceDoc {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vehicleId         String    @map("vehicle_id") @db.Uuid
+  maintenanceDocUrl String?   @map("maintenance_doc_url")
+  notes             String?
+  scheduledDate     DateTime? @map("scheduled_date") @db.Date
+  maintenanceStatus String    @default("pending") @map("maintenance_status")
+  completedDate     DateTime? @map("completed_date") @db.Date
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy         String?   @map("deleted_by") @db.Uuid
+  createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  vehicle           Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@map("vehicle_maintenance_docs")
 }
 
 model Route {

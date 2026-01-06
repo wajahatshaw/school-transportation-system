@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Pencil, Trash2, Wrench } from 'lucide-react'
 import { updateVehicle, deleteVehicle } from '@/lib/actions'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,8 @@ type Vehicle = {
   capacity: number
   licensePlate: string | null
   vehicleType: string | null
+  manufactureYear: number | null
+  model: string | null
   deletedAt: Date | null
   deletedBy: string | null
   createdAt: Date | null
@@ -30,6 +33,7 @@ interface VehiclesTableProps {
 }
 
 export function VehiclesTable({ vehicles, onUpdate }: VehiclesTableProps) {
+  const router = useRouter()
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
   const [deletingVehicle, setDeletingVehicle] = useState<Vehicle | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -43,6 +47,8 @@ export function VehiclesTable({ vehicles, onUpdate }: VehiclesTableProps) {
     capacity: number
     licensePlate?: string
     vehicleType?: string
+    manufactureYear?: number
+    model?: string
   }) => {
     if (!editingVehicle) return
 
@@ -92,6 +98,10 @@ export function VehiclesTable({ vehicles, onUpdate }: VehiclesTableProps) {
     })
   }
 
+  const handleViewMaintenance = (vehicleId: string) => {
+    router.push(`/dashboard/vehicles/${vehicleId}/maintenance`)
+  }
+
   if (vehicles.length === 0) {
     return (
       <EmptyState
@@ -120,6 +130,9 @@ export function VehiclesTable({ vehicles, onUpdate }: VehiclesTableProps) {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   License Plate
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Year / Model
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Status
@@ -165,12 +178,35 @@ export function VehiclesTable({ vehicles, onUpdate }: VehiclesTableProps) {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-slate-900">
+                      {vehicle.manufactureYear || vehicle.model ? (
+                        <>
+                          {vehicle.manufactureYear && <span>{vehicle.manufactureYear}</span>}
+                          {vehicle.manufactureYear && vehicle.model && <span className="mx-1">/</span>}
+                          {vehicle.model && <span>{vehicle.model}</span>}
+                        </>
+                      ) : (
+                        'N/A'
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <Badge variant={vehicle.deletedAt ? 'danger' : 'success'}>
                       {vehicle.deletedAt ? 'Deleted' : 'Active'}
                     </Badge>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end gap-2">
+                      <Button
+                        onClick={() => handleViewMaintenance(vehicle.id)}
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-700"
+                        disabled={isPending}
+                      >
+                        <Wrench className="h-4 w-4 mr-1" />
+                        Maintenance
+                      </Button>
                       <Button
                         onClick={() => handleEdit(vehicle)}
                         variant="ghost"

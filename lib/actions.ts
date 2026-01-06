@@ -722,6 +722,8 @@ export async function getVehicles() {
       capacity: number
       license_plate: string | null
       vehicle_type: string | null
+      manufacture_year: number | null
+      model: string | null
       deleted_at: Date | null
       deleted_by: string | null
       created_at: Date
@@ -738,6 +740,8 @@ export async function getVehicles() {
       capacity: v.capacity,
       licensePlate: v.license_plate,
       vehicleType: v.vehicle_type,
+      manufactureYear: v.manufacture_year,
+      model: v.model,
       deletedAt: v.deleted_at,
       deletedBy: v.deleted_by,
       createdAt: v.created_at,
@@ -751,33 +755,76 @@ export async function createVehicle(data: {
   capacity: number
   licensePlate?: string
   vehicleType?: string
+  manufactureYear?: number
+  model?: string
 }) {
   const context = await getTenantContext()
   
+  // Validate capacity
   if (!Number.isInteger(data.capacity) || data.capacity <= 0) {
-    throw new Error('Capacity must be a positive integer')
+    throw new Error('Vehicle capacity must be a positive number (e.g., 20, 30, 40)')
   }
   if (data.capacity > 60) {
-    throw new Error('Capacity cannot be more than 60')
+    throw new Error('Vehicle capacity cannot exceed 60 seats. Please enter a value between 1 and 60.')
+  }
+
+  // Validate manufacture year if provided
+  if (data.manufactureYear !== undefined) {
+    const currentYear = new Date().getFullYear()
+    if (!Number.isInteger(data.manufactureYear) || data.manufactureYear < 1900 || data.manufactureYear > currentYear + 1) {
+      throw new Error(`Manufacture year must be between 1900 and ${currentYear + 1}`)
+    }
+  }
+
+  // Validate name
+  if (!data.name || data.name.trim().length === 0) {
+    throw new Error('Vehicle name is required. Please enter a name for the vehicle.')
+  }
+
+  if (data.name.trim().length > 255) {
+    throw new Error('Vehicle name is too long. Please use 255 characters or less.')
   }
 
   return await withTenantContext(context, async (tx) => {
-    const vehicle = await tx.vehicle.create({
-      data: {
-        tenantId: context.tenantId,
-        name: data.name,
-        capacity: data.capacity,
-        licensePlate: data.licensePlate,
-        vehicleType: data.vehicleType
+    try {
+      const vehicle = await tx.vehicle.create({
+        data: {
+          tenantId: context.tenantId,
+          name: data.name.trim(),
+          capacity: data.capacity,
+          licensePlate: data.licensePlate?.trim() || null,
+          vehicleType: data.vehicleType?.trim() || null,
+          ...(data.manufactureYear !== undefined && { manufactureYear: data.manufactureYear }),
+          ...(data.model !== undefined && { model: data.model?.trim() || null }),
+        }
+      })
+      
+      revalidatePath('/dashboard/vehicles')
+      revalidatePath('/dashboard/routes')
+      revalidatePath('/dashboard')
+      revalidatePath('/dashboard/audit-logs')
+      
+      return vehicle
+    } catch (error) {
+      // Handle Prisma errors with user-friendly messages
+      if (error instanceof Error) {
+        if (error.message.includes('Unique constraint')) {
+          throw new Error('A vehicle with this information already exists. Please check the details and try again.')
+        }
+        if (error.message.includes('Foreign key constraint')) {
+          throw new Error('Invalid reference. Please ensure all related data is correct.')
+        }
+        if (error.message.includes('required')) {
+          throw new Error('Missing required information. Please fill in all required fields.')
+        }
+        // Re-throw validation errors as-is (they're already user-friendly)
+        if (error.message.includes('capacity') || error.message.includes('Manufacture year') || error.message.includes('Vehicle name')) {
+          throw error
+        }
+        throw new Error('Failed to create vehicle. Please check your input and try again.')
       }
-    })
-    
-    revalidatePath('/dashboard/vehicles')
-    revalidatePath('/dashboard/routes')
-    revalidatePath('/dashboard')
-    revalidatePath('/dashboard/audit-logs')
-    
-    return vehicle
+      throw new Error('An unexpected error occurred while creating the vehicle. Please try again.')
+    }
   })
 }
 
@@ -788,15 +835,35 @@ export async function updateVehicle(
     capacity: number
     licensePlate?: string
     vehicleType?: string
+    manufactureYear?: number
+    model?: string
   }
 ) {
   const context = await getTenantContext()
   
+  // Validate capacity
   if (!Number.isInteger(data.capacity) || data.capacity <= 0) {
-    throw new Error('Capacity must be a positive integer')
+    throw new Error('Vehicle capacity must be a positive number (e.g., 20, 30, 40)')
   }
   if (data.capacity > 60) {
-    throw new Error('Capacity cannot be more than 60')
+    throw new Error('Vehicle capacity cannot exceed 60 seats. Please enter a value between 1 and 60.')
+  }
+
+  // Validate manufacture year if provided
+  if (data.manufactureYear !== undefined) {
+    const currentYear = new Date().getFullYear()
+    if (!Number.isInteger(data.manufactureYear) || data.manufactureYear < 1900 || data.manufactureYear > currentYear + 1) {
+      throw new Error(`Manufacture year must be between 1900 and ${currentYear + 1}`)
+    }
+  }
+
+  // Validate name
+  if (!data.name || data.name.trim().length === 0) {
+    throw new Error('Vehicle name is required. Please enter a name for the vehicle.')
+  }
+
+  if (data.name.trim().length > 255) {
+    throw new Error('Vehicle name is too long. Please use 255 characters or less.')
   }
 
   return await withTenantContext(context, async (tx) => {
@@ -805,25 +872,48 @@ export async function updateVehicle(
       where: { id, tenantId: context.tenantId }
     })
     if (!existing) {
-      throw new Error('Vehicle not found or access denied')
+      throw new Error('Vehicle not found. It may have been deleted or you may not have permission to access it.')
     }
     
-    const vehicle = await tx.vehicle.update({
-      where: { id },
-      data: {
-        name: data.name,
-        capacity: data.capacity,
-        licensePlate: data.licensePlate,
-        vehicleType: data.vehicleType
+    try {
+      const vehicle = await tx.vehicle.update({
+        where: { id },
+        data: {
+          name: data.name.trim(),
+          capacity: data.capacity,
+          licensePlate: data.licensePlate?.trim() || null,
+          vehicleType: data.vehicleType?.trim() || null,
+          ...(data.manufactureYear !== undefined && { manufactureYear: data.manufactureYear }),
+          ...(data.model !== undefined && { model: data.model?.trim() || null }),
+        }
+      })
+      
+      revalidatePath('/dashboard/vehicles')
+      revalidatePath('/dashboard/routes')
+      revalidatePath('/dashboard')
+      revalidatePath('/dashboard/audit-logs')
+      
+      return vehicle
+    } catch (error) {
+      // Handle Prisma errors with user-friendly messages
+      if (error instanceof Error) {
+        if (error.message.includes('Unique constraint')) {
+          throw new Error('A vehicle with this information already exists. Please check the details and try again.')
+        }
+        if (error.message.includes('Foreign key constraint')) {
+          throw new Error('Invalid reference. Please ensure all related data is correct.')
+        }
+        if (error.message.includes('required')) {
+          throw new Error('Missing required information. Please fill in all required fields.')
+        }
+        // Re-throw validation errors as-is (they're already user-friendly)
+        if (error.message.includes('capacity') || error.message.includes('Manufacture year') || error.message.includes('Vehicle name')) {
+          throw error
+        }
+        throw new Error('Failed to update vehicle. Please check your input and try again.')
       }
-    })
-    
-    revalidatePath('/dashboard/vehicles')
-    revalidatePath('/dashboard/routes')
-    revalidatePath('/dashboard')
-    revalidatePath('/dashboard/audit-logs')
-    
-    return vehicle
+      throw new Error('An unexpected error occurred while updating the vehicle. Please try again.')
+    }
   })
 }
 
@@ -856,6 +946,184 @@ export async function deleteVehicle(id: string) {
   })
 }
 
+// ============================================================================
+// VEHICLE MAINTENANCE DOCS CRUD - All operations rely on RLS
+// ============================================================================
+
+export async function getVehicleMaintenanceDocuments(vehicleId: string) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
+    const docs = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      vehicle_id: string
+      maintenance_doc_url: string | null
+      notes: string | null
+      scheduled_date: Date | null
+      maintenance_status: string
+      completed_date: Date | null
+      deleted_at: Date | null
+      deleted_by: string | null
+      created_at: Date
+      updated_at: Date
+    }>>`
+      SELECT * FROM app.v_vehicle_maintenance_docs
+      WHERE vehicle_id = ${vehicleId}::uuid
+      ORDER BY scheduled_date DESC NULLS LAST, created_at DESC
+    `
+    
+    return docs.map(d => ({
+      id: d.id,
+      tenantId: d.tenant_id,
+      vehicleId: d.vehicle_id,
+      maintenanceDocUrl: d.maintenance_doc_url,
+      notes: d.notes,
+      scheduledDate: d.scheduled_date,
+      maintenanceStatus: d.maintenance_status,
+      completedDate: d.completed_date,
+      deletedAt: d.deleted_at,
+      deletedBy: d.deleted_by,
+      createdAt: d.created_at,
+      updatedAt: d.updated_at
+    }))
+  })
+}
+
+export async function createVehicleMaintenanceDocument(data: {
+  vehicleId: string
+  maintenanceDocUrl?: string
+  notes?: string
+  scheduledDate?: Date
+  maintenanceStatus?: string
+  completedDate?: Date
+}) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Verify vehicle exists and belongs to tenant
+    const vehicle = await tx.vehicle.findFirst({
+      where: { id: data.vehicleId, tenantId: context.tenantId, deletedAt: null }
+    })
+    
+    if (!vehicle) {
+      throw new Error('Vehicle not found or access denied')
+    }
+    
+    const doc = await tx.vehicleMaintenanceDoc.create({
+      data: {
+        vehicleId: data.vehicleId,
+        maintenanceDocUrl: data.maintenanceDocUrl,
+        notes: data.notes?.trim() || null,
+        scheduledDate: data.scheduledDate,
+        maintenanceStatus: data.maintenanceStatus || 'pending',
+        completedDate: data.completedDate
+      }
+    })
+    
+    revalidatePath(`/dashboard/vehicles/${data.vehicleId}/maintenance`)
+    revalidatePath('/dashboard/vehicles')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
+    
+    return doc
+  })
+}
+
+export async function updateVehicleMaintenanceDocument(
+  id: string,
+  data: {
+    maintenanceDocUrl?: string
+    notes?: string
+    scheduledDate?: Date
+    maintenanceStatus?: string
+    completedDate?: Date
+  }
+) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Get existing document and verify access via vehicle
+    const existing = await tx.$queryRaw<Array<{
+      id: string
+      vehicle_id: string
+    }>>`
+      SELECT vmd.id, vmd.vehicle_id
+      FROM vehicle_maintenance_docs vmd
+      INNER JOIN vehicles v ON v.id = vmd.vehicle_id
+      WHERE vmd.id = ${id}::uuid
+        AND v.tenant_id = ${context.tenantId}::uuid
+        AND vmd.deleted_at IS NULL
+        AND v.deleted_at IS NULL
+    `
+    
+    if (!existing || existing.length === 0) {
+      throw new Error('Document not found or access denied')
+    }
+    
+    const vehicleId = existing[0].vehicle_id
+    
+    const doc = await tx.vehicleMaintenanceDoc.update({
+      where: { id },
+      data: {
+        ...(data.maintenanceDocUrl !== undefined && { maintenanceDocUrl: data.maintenanceDocUrl }),
+        ...(data.notes !== undefined && { notes: data.notes?.trim() || null }),
+        ...(data.scheduledDate !== undefined && { scheduledDate: data.scheduledDate }),
+        ...(data.maintenanceStatus !== undefined && { maintenanceStatus: data.maintenanceStatus }),
+        ...(data.completedDate !== undefined && { completedDate: data.completedDate }),
+      }
+    })
+    
+    revalidatePath(`/dashboard/vehicles/${vehicleId}/maintenance`)
+    revalidatePath('/dashboard/vehicles')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
+    
+    return doc
+  })
+}
+
+export async function deleteVehicleMaintenanceDocument(id: string) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Get existing document and verify access via vehicle
+    const existing = await tx.$queryRaw<Array<{
+      id: string
+      vehicle_id: string
+    }>>`
+      SELECT vmd.id, vmd.vehicle_id
+      FROM vehicle_maintenance_docs vmd
+      INNER JOIN vehicles v ON v.id = vmd.vehicle_id
+      WHERE vmd.id = ${id}::uuid
+        AND v.tenant_id = ${context.tenantId}::uuid
+        AND vmd.deleted_at IS NULL
+        AND v.deleted_at IS NULL
+    `
+    
+    if (!existing || existing.length === 0) {
+      throw new Error('Document not found or access denied')
+    }
+    
+    const vehicleId = existing[0].vehicle_id
+    
+    // Soft delete
+    await tx.vehicleMaintenanceDoc.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        deletedBy: context.userId
+      }
+    })
+    
+    revalidatePath(`/dashboard/vehicles/${vehicleId}/maintenance`)
+    revalidatePath('/dashboard/vehicles')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
+  })
+}
+
 export async function getVehicleById(vehicleId: string) {
   const context = await getTenantContext()
   
@@ -868,6 +1136,8 @@ export async function getVehicleById(vehicleId: string) {
       capacity: number
       license_plate: string | null
       vehicle_type: string | null
+      manufacture_year: number | null
+      model: string | null
       deleted_at: Date | null
       deleted_by: string | null
       created_at: Date
@@ -888,6 +1158,8 @@ export async function getVehicleById(vehicleId: string) {
       capacity: v.capacity,
       licensePlate: v.license_plate,
       vehicleType: v.vehicle_type,
+      manufactureYear: v.manufacture_year,
+      model: v.model,
       deletedAt: v.deleted_at,
       deletedBy: v.deleted_by,
       createdAt: v.created_at,

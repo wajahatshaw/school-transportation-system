@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body with proper error handling for Netlify compatibility
     // Use text() then parse manually - more reliable on Netlify than request.json()
-    let body: { name?: string; capacity?: number; licensePlate?: string; vehicleType?: string }
+    let body: { name?: string; capacity?: number; licensePlate?: string; vehicleType?: string; manufactureYear?: number; model?: string }
     try {
       const text = await request.text()
       if (!text || text.trim() === '') {
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { name, capacity, licensePlate, vehicleType } = body
+    const { name, capacity, licensePlate, vehicleType, manufactureYear, model } = body
 
     if (!name || !capacity) {
       return NextResponse.json(
@@ -86,6 +86,8 @@ export async function POST(request: NextRequest) {
       capacity: Number(capacity),
       licensePlate: licensePlate ? String(licensePlate).trim() : undefined,
       vehicleType: vehicleType ? String(vehicleType).trim() : undefined,
+      manufactureYear: manufactureYear ? Number(manufactureYear) : undefined,
+      model: model ? String(model).trim() : undefined,
     })
 
     return NextResponse.json(vehicle, { status: 201 })
