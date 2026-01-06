@@ -664,6 +664,24 @@ export async function getCurrentTenant() {
   })
 }
 
+/**
+ * Get total count of all tenants (schools) in the system
+ * This bypasses RLS to get system-wide count
+ */
+export async function getTenantsCount() {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Query tenants table directly (not through view) to get all tenants
+    // Note: Tenant model doesn't have deleted_at column, so we count all tenants
+    const result = await tx.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::bigint as count
+      FROM tenants
+    `
+    return Number(result[0]?.count || 0)
+  })
+}
+
 // ============================================================================
 // DRIVER BY ID (for compliance page)
 // ============================================================================
@@ -787,24 +805,24 @@ export async function createVehicle(data: {
 
   return await withTenantContext(context, async (tx) => {
     try {
-      const vehicle = await tx.vehicle.create({
-        data: {
-          tenantId: context.tenantId,
+    const vehicle = await tx.vehicle.create({
+      data: {
+        tenantId: context.tenantId,
           name: data.name.trim(),
-          capacity: data.capacity,
+        capacity: data.capacity,
           licensePlate: data.licensePlate?.trim() || null,
           vehicleType: data.vehicleType?.trim() || null,
           ...(data.manufactureYear !== undefined && { manufactureYear: data.manufactureYear }),
           ...(data.model !== undefined && { model: data.model?.trim() || null }),
-        }
-      })
-      
-      revalidatePath('/dashboard/vehicles')
-      revalidatePath('/dashboard/routes')
-      revalidatePath('/dashboard')
-      revalidatePath('/dashboard/audit-logs')
-      
-      return vehicle
+      }
+    })
+    
+    revalidatePath('/dashboard/vehicles')
+    revalidatePath('/dashboard/routes')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
+    
+    return vehicle
     } catch (error) {
       // Handle Prisma errors with user-friendly messages
       if (error instanceof Error) {
@@ -876,24 +894,24 @@ export async function updateVehicle(
     }
     
     try {
-      const vehicle = await tx.vehicle.update({
-        where: { id },
-        data: {
+    const vehicle = await tx.vehicle.update({
+      where: { id },
+      data: {
           name: data.name.trim(),
-          capacity: data.capacity,
+        capacity: data.capacity,
           licensePlate: data.licensePlate?.trim() || null,
           vehicleType: data.vehicleType?.trim() || null,
           ...(data.manufactureYear !== undefined && { manufactureYear: data.manufactureYear }),
           ...(data.model !== undefined && { model: data.model?.trim() || null }),
-        }
-      })
-      
-      revalidatePath('/dashboard/vehicles')
-      revalidatePath('/dashboard/routes')
-      revalidatePath('/dashboard')
-      revalidatePath('/dashboard/audit-logs')
-      
-      return vehicle
+      }
+    })
+    
+    revalidatePath('/dashboard/vehicles')
+    revalidatePath('/dashboard/routes')
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/audit-logs')
+    
+    return vehicle
     } catch (error) {
       // Handle Prisma errors with user-friendly messages
       if (error instanceof Error) {

@@ -12,7 +12,7 @@ import {
   TrendingUp,
   ArrowRight,
 } from 'lucide-react'
-import { getRoutes, getStudents, getVehicles } from '@/lib/actions'
+import { getRoutes, getStudents, getVehicles, getTenantsCount } from '@/lib/actions'
 import { withTenantContext, getTenantContext } from '@/lib/withTenantContext'
 import { getComplianceStatus } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -179,13 +179,12 @@ export default async function DashboardPage() {
 }
 
 async function MetricsCards() {
-  const [students, routes, vehicles] = await Promise.all([getStudents(), getRoutes(), getVehicles()])
-
-  const schoolsCount = new Set(
-    students
-      .map((s: any) => (typeof s.schoolName === 'string' ? s.schoolName.trim() : ''))
-      .filter(Boolean)
-  ).size
+  const [students, routes, vehicles, tenantsCount] = await Promise.all([
+    getStudents(), 
+    getRoutes(), 
+    getVehicles(),
+    getTenantsCount()
+  ])
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -194,13 +193,13 @@ async function MetricsCards() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-slate-600">Total Schools</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2">{schoolsCount}</p>
+            <p className="text-3xl font-bold text-slate-900 mt-2">{tenantsCount}</p>
           </div>
           <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center">
             <School className="h-6 w-6 text-indigo-600" />
           </div>
         </div>
-        <p className="text-xs text-slate-500 mt-4">Unique school names in students</p>
+        <p className="text-xs text-slate-500 mt-4">Total schools in the system</p>
       </div>
 
       {/* Total Routes */}

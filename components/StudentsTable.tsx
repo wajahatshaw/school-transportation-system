@@ -18,9 +18,10 @@ interface StudentsTableProps {
   drivers: Driver[]
   vehicles: Vehicle[]
   onUpdate?: () => void
+  tenantName?: string
 }
 
-export function StudentsTable({ students, drivers, vehicles, onUpdate }: StudentsTableProps) {
+export function StudentsTable({ students, drivers, vehicles, onUpdate, tenantName = '' }: StudentsTableProps) {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -104,9 +105,10 @@ export function StudentsTable({ students, drivers, vehicles, onUpdate }: Student
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-[1700px] w-full divide-y divide-slate-200">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden w-full">
+        <div className="overflow-x-auto w-full">
+          <div className="inline-block min-w-full align-middle">
+            <table className="min-w-[1200px] w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -276,6 +278,7 @@ export function StudentsTable({ students, drivers, vehicles, onUpdate }: Student
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -284,6 +287,7 @@ export function StudentsTable({ students, drivers, vehicles, onUpdate }: Student
           student={editingStudent}
           onClose={() => setEditingStudent(null)}
           onSave={handleUpdate}
+          tenantName={tenantName}
         />
       )}
 

@@ -31,10 +31,13 @@ interface EditStudentModalProps {
     schoolAddress?: string | null
     schoolPhone?: string | null
   }) => Promise<void>
+  tenantName?: string
 }
 
-export function EditStudentModal({ student, onClose, onSave }: EditStudentModalProps) {
+export function EditStudentModal({ student, onClose, onSave, tenantName = '' }: EditStudentModalProps) {
   const [isPending, startTransition] = useTransition()
+  // Use tenant name if available, otherwise fall back to student's school name
+  const defaultSchoolName = tenantName || (student as any).schoolName || ''
   const [formData, setFormData] = useState({
     firstName: student.firstName,
     lastName: student.lastName,
@@ -43,7 +46,7 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
     morningPickupTime: (student as any).morningPickupTime || '',
     guardianName: (student as any).guardianName || '',
     guardianPhone: (student as any).guardianPhone || '',
-    schoolName: (student as any).schoolName || '',
+    schoolName: defaultSchoolName,
     schoolAddress: (student as any).schoolAddress || '',
     schoolPhone: (student as any).schoolPhone || '',
   })
@@ -90,7 +93,7 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
         morningPickupTime: morningPickup || null,
         guardianName: formData.guardianName.trim() || null,
         guardianPhone: guardianPhoneCheck.ok ? (guardianPhoneCheck.e164 || null) : null,
-        schoolName: formData.schoolName.trim() || null,
+        schoolName: tenantName || formData.schoolName.trim() || null, // Always use tenant name if available
         schoolAddress: formData.schoolAddress.trim() || null,
         schoolPhone: schoolPhoneCheck.ok ? (schoolPhoneCheck.e164 || null) : null,
       })
@@ -119,9 +122,9 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent 
         onClose={onClose}
-        className="w-[92vw] max-w-[980px] max-h-[90vh] overflow-hidden flex flex-col"
+        className="w-[95vw] sm:w-[92vw] max-w-[980px] max-h-[90vh] overflow-hidden flex flex-col"
       >
-        <DialogHeader>
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
               <User className="h-6 w-6 text-blue-600" />
@@ -136,8 +139,8 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 pb-4 px-4 sm:px-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
             {/* First Name */}
             <div className="space-y-2">
               <Label htmlFor="firstName" className="text-sm font-medium text-slate-700">
@@ -267,11 +270,13 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
               </Label>
               <Input
                 id="schoolName"
-                value={formData.schoolName}
-                onChange={(e) => handleChange('schoolName', e.target.value)}
-                placeholder="School name"
-                disabled={isPending}
+                value={tenantName || formData.schoolName}
+                readOnly
+                disabled={true}
+                className="bg-slate-50 cursor-not-allowed"
+                title="School name is automatically set to your organization name"
               />
+              <p className="text-xs text-slate-500">Automatically set to your organization name</p>
             </div>
 
             {/* School Phone */}
@@ -311,7 +316,7 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t bg-white">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t bg-white mt-4 sticky bottom-0 z-10 px-4 sm:px-6 pb-4 sm:pb-6">
             <Button
               type="button"
               variant="outline"

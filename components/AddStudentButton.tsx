@@ -19,9 +19,10 @@ import { normalizeTimeHHMM, validateTimeHHMM } from '@/lib/time'
 
 interface AddStudentButtonProps {
   onSuccess?: () => void
+  tenantName: string
 }
 
-export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
+export function AddStudentButton({ onSuccess, tenantName }: AddStudentButtonProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -33,7 +34,7 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
     morningPickupTime: '',
     guardianName: '',
     guardianPhone: '',
-    schoolName: '',
+    schoolName: tenantName, // Pre-fill with tenant name
     schoolAddress: '',
     schoolPhone: '',
   })
@@ -86,7 +87,7 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
             morningPickupTime: morningPickup || undefined,
             guardianName: formData.guardianName.trim() || undefined,
             guardianPhone: guardianPhoneCheck.ok ? (guardianPhoneCheck.e164 || undefined) : undefined,
-            schoolName: formData.schoolName.trim() || undefined,
+            schoolName: tenantName || undefined, // Always use tenant name
             schoolAddress: formData.schoolAddress.trim() || undefined,
             schoolPhone: schoolPhoneCheck.ok ? (schoolPhoneCheck.e164 || undefined) : undefined,
           }),
@@ -109,7 +110,7 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
           morningPickupTime: '',
           guardianName: '',
           guardianPhone: '',
-          schoolName: '',
+          schoolName: tenantName, // Reset to tenant name
           schoolAddress: '',
           schoolPhone: '',
         })
@@ -158,7 +159,7 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
         morningPickupTime: '',
         guardianName: '',
         guardianPhone: '',
-        schoolName: '',
+        schoolName: tenantName, // Reset to tenant name
         schoolAddress: '',
         schoolPhone: '',
       })
@@ -176,9 +177,9 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent 
           onClose={handleClose}
-          className="w-[92vw] max-w-[980px] max-h-[90vh] overflow-hidden flex flex-col"
+          className="w-[95vw] sm:w-[92vw] max-w-[980px] max-h-[90vh] overflow-hidden flex flex-col"
         >
-          <DialogHeader>
+          <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
                 <User className="h-6 w-6 text-blue-600" />
@@ -193,8 +194,8 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-            <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 pb-4 px-4 sm:px-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               {/* First Name */}
               <div className="space-y-2">
                 <Label htmlFor="firstName" className="text-sm font-medium text-slate-700">
@@ -325,10 +326,12 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
                 <Input
                   id="schoolName"
                   value={formData.schoolName}
-                  onChange={(e) => handleChange('schoolName', e.target.value)}
-                  placeholder="School name"
-                  disabled={isPending}
+                  readOnly
+                  disabled={true}
+                  className="bg-slate-50 cursor-not-allowed"
+                  title="School name is automatically set to your organization name"
                 />
+                <p className="text-xs text-slate-500">Automatically set to your organization name</p>
               </div>
 
               {/* School Phone */}
@@ -368,7 +371,7 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
             </div>
 
             {/* Footer Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t bg-white">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t bg-white mt-4 sticky bottom-0 z-10 px-4 sm:px-6 pb-4 sm:pb-6">
               <Button
                 type="button"
                 variant="outline"

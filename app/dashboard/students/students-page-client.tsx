@@ -10,9 +10,10 @@ interface StudentsPageClientProps {
   initialStudents: Student[]
   drivers: Driver[]
   vehicles: Vehicle[]
+  tenantName: string
 }
 
-export function StudentsPageClient({ initialStudents, drivers, vehicles }: StudentsPageClientProps) {
+export function StudentsPageClient({ initialStudents, drivers, vehicles, tenantName }: StudentsPageClientProps) {
   const [students, setStudents] = useState(initialStudents)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -34,5 +35,5 @@ export function StudentsPageClient({ initialStudents, drivers, vehicles }: Stude
     })
   }
 
-  return <StudentsTable students={students} drivers={drivers} vehicles={vehicles} onUpdate={handleUpdate} />
+  return <StudentsTable students={students} drivers={drivers} vehicles={vehicles} onUpdate={handleUpdate} tenantName={tenantName} />
 }

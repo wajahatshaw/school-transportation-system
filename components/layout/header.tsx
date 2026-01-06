@@ -26,7 +26,7 @@ export function Sidebar({ isCollapsed, onToggle, children }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-16 bottom-0 z-40 bg-white border-r border-slate-200 transition-all duration-300',
+          'fixed left-0 top-16 bottom-0 z-40 bg-white border-r border-slate-200 transition-all duration-300 overflow-y-auto',
           isCollapsed ? '-translate-x-full lg:translate-x-0 lg:w-16' : 'w-64'
         )}
       >
@@ -36,7 +36,7 @@ export function Sidebar({ isCollapsed, onToggle, children }: SidebarProps) {
       {/* Spacer for desktop */}
       <div
         className={cn(
-          'hidden lg:block transition-all duration-300',
+          'hidden lg:block transition-all duration-300 flex-shrink-0',
           isCollapsed ? 'w-16' : 'w-64'
         )}
       />
