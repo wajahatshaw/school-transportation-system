@@ -21,12 +21,19 @@ export async function getStudents() {
       last_name: string
       grade: string | null
       student_address: string | null
-      pickup_address: string | null
+      morning_pickup_time: string | null
+      morning_drop_time: string | null
+      afternoon_pickup_time: string | null
+      afternoon_drop_time: string | null
       guardian_name: string | null
       guardian_phone: string | null
       school_name: string | null
       school_address: string | null
       school_phone: string | null
+      vehicle_id: string | null
+      driver_id: string | null
+      serial_no: string | null
+      run_id: string | null
       route_id: string | null
       deleted_at: Date | null
       deleted_by: string | null
@@ -45,12 +52,19 @@ export async function getStudents() {
       lastName: s.last_name,
       grade: s.grade,
       studentAddress: s.student_address,
-      pickupAddress: s.pickup_address,
+      morningPickupTime: s.morning_pickup_time,
+      morningDropTime: s.morning_drop_time,
+      afternoonPickupTime: s.afternoon_pickup_time,
+      afternoonDropTime: s.afternoon_drop_time,
       guardianName: s.guardian_name,
       guardianPhone: s.guardian_phone,
       schoolName: s.school_name,
       schoolAddress: s.school_address,
       schoolPhone: s.school_phone,
+      vehicleId: s.vehicle_id,
+      driverId: s.driver_id,
+      serialNo: s.serial_no,
+      runId: s.run_id,
       routeId: s.route_id,
       deletedAt: s.deleted_at,
       deletedBy: s.deleted_by,
@@ -65,12 +79,19 @@ export async function createStudent(data: {
   lastName: string
   grade?: string
   studentAddress?: string
-  pickupAddress?: string
+  morningPickupTime?: string
+  morningDropTime?: string
+  afternoonPickupTime?: string
+  afternoonDropTime?: string
   guardianName?: string
   guardianPhone?: string
   schoolName?: string
   schoolAddress?: string
   schoolPhone?: string
+  vehicleId?: string
+  driverId?: string
+  serialNo?: string
+  runId?: string
 }) {
   const context = await getTenantContext()
   
@@ -82,12 +103,19 @@ export async function createStudent(data: {
         lastName: data.lastName,
         grade: data.grade,
         studentAddress: data.studentAddress,
-        pickupAddress: data.pickupAddress,
+        morningPickupTime: data.morningPickupTime,
+        morningDropTime: data.morningDropTime,
+        afternoonPickupTime: data.afternoonPickupTime,
+        afternoonDropTime: data.afternoonDropTime,
         guardianName: data.guardianName,
         guardianPhone: data.guardianPhone,
         schoolName: data.schoolName,
         schoolAddress: data.schoolAddress,
         schoolPhone: data.schoolPhone,
+        vehicleId: data.vehicleId,
+        driverId: data.driverId,
+        serialNo: data.serialNo,
+        runId: data.runId,
       }
     })
     
@@ -107,12 +135,19 @@ export async function updateStudent(
     lastName: string
     grade?: string
     studentAddress?: string | null
-    pickupAddress?: string | null
+    morningPickupTime?: string | null
+    morningDropTime?: string | null
+    afternoonPickupTime?: string | null
+    afternoonDropTime?: string | null
     guardianName?: string | null
     guardianPhone?: string | null
     schoolName?: string | null
     schoolAddress?: string | null
     schoolPhone?: string | null
+    vehicleId?: string | null
+    driverId?: string | null
+    serialNo?: string | null
+    runId?: string | null
   }
 ) {
   const context = await getTenantContext()
@@ -134,12 +169,19 @@ export async function updateStudent(
         lastName: data.lastName,
         grade: data.grade,
         studentAddress: data.studentAddress === undefined ? undefined : data.studentAddress,
-        pickupAddress: data.pickupAddress === undefined ? undefined : data.pickupAddress,
+        morningPickupTime: data.morningPickupTime === undefined ? undefined : data.morningPickupTime,
+        morningDropTime: data.morningDropTime === undefined ? undefined : data.morningDropTime,
+        afternoonPickupTime: data.afternoonPickupTime === undefined ? undefined : data.afternoonPickupTime,
+        afternoonDropTime: data.afternoonDropTime === undefined ? undefined : data.afternoonDropTime,
         guardianName: data.guardianName === undefined ? undefined : data.guardianName,
         guardianPhone: data.guardianPhone === undefined ? undefined : data.guardianPhone,
         schoolName: data.schoolName === undefined ? undefined : data.schoolName,
         schoolAddress: data.schoolAddress === undefined ? undefined : data.schoolAddress,
         schoolPhone: data.schoolPhone === undefined ? undefined : data.schoolPhone,
+        vehicleId: data.vehicleId === undefined ? undefined : data.vehicleId,
+        driverId: data.driverId === undefined ? undefined : data.driverId,
+        serialNo: data.serialNo === undefined ? undefined : data.serialNo,
+        runId: data.runId === undefined ? undefined : data.runId,
       }
     })
     

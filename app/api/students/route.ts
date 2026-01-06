@@ -38,12 +38,19 @@ export async function POST(request: NextRequest) {
       lastName?: string
       grade?: string
       studentAddress?: string
-      pickupAddress?: string
+      morningPickupTime?: string
+      morningDropTime?: string
+      afternoonPickupTime?: string
+      afternoonDropTime?: string
       guardianName?: string
       guardianPhone?: string
       schoolName?: string
       schoolAddress?: string
       schoolPhone?: string
+      vehicleId?: string
+      driverId?: string
+      serialNo?: string
+      runId?: string
     }
     try {
       const text = await request.text()
@@ -74,12 +81,19 @@ export async function POST(request: NextRequest) {
       lastName,
       grade,
       studentAddress,
-      pickupAddress,
+      morningPickupTime,
+      morningDropTime,
+      afternoonPickupTime,
+      afternoonDropTime,
       guardianName,
       guardianPhone,
       schoolName,
       schoolAddress,
       schoolPhone,
+      vehicleId,
+      driverId,
+      serialNo,
+      runId,
     } = body
 
     if (!firstName || !lastName) {
@@ -94,12 +108,19 @@ export async function POST(request: NextRequest) {
       lastName: String(lastName).trim(),
       grade: grade ? String(grade).trim() : undefined,
       studentAddress: studentAddress ? String(studentAddress).trim() : undefined,
-      pickupAddress: pickupAddress ? String(pickupAddress).trim() : undefined,
+      morningPickupTime: morningPickupTime ? String(morningPickupTime).trim() : undefined,
+      morningDropTime: morningDropTime ? String(morningDropTime).trim() : undefined,
+      afternoonPickupTime: afternoonPickupTime ? String(afternoonPickupTime).trim() : undefined,
+      afternoonDropTime: afternoonDropTime ? String(afternoonDropTime).trim() : undefined,
       guardianName: guardianName ? String(guardianName).trim() : undefined,
       guardianPhone: guardianPhone ? String(guardianPhone).trim() : undefined,
       schoolName: schoolName ? String(schoolName).trim() : undefined,
       schoolAddress: schoolAddress ? String(schoolAddress).trim() : undefined,
       schoolPhone: schoolPhone ? String(schoolPhone).trim() : undefined,
+      vehicleId: vehicleId ? String(vehicleId).trim() : undefined,
+      driverId: driverId ? String(driverId).trim() : undefined,
+      serialNo: serialNo ? String(serialNo).trim() : undefined,
+      runId: runId ? String(runId).trim() : undefined,
     })
 
     return NextResponse.json(student, { status: 201 })

@@ -30,7 +30,7 @@ export function StudentsTable({ students, onUpdate }: StudentsTableProps) {
     lastName: string
     grade?: string
     studentAddress?: string | null
-    pickupAddress?: string | null
+    morningPickupTime?: string | null
     guardianName?: string | null
     guardianPhone?: string | null
     schoolName?: string | null

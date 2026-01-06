@@ -43,12 +43,19 @@ model Student {
   lastName   String   @map("last_name")
   grade      String?
   studentAddress String? @map("student_address")
-  pickupAddress  String? @map("pickup_address")
+  morningPickupTime    String? @map("morning_pickup_time")
+  morningDropTime      String? @map("morning_drop_time")
+  afternoonPickupTime  String? @map("afternoon_pickup_time")
+  afternoonDropTime    String? @map("afternoon_drop_time")
   guardianName   String? @map("guardian_name")
   guardianPhone  String? @map("guardian_phone")
   schoolName     String? @map("school_name")
   schoolAddress  String? @map("school_address")
   schoolPhone    String? @map("school_phone")
+  vehicleId      String? @map("vehicle_id") @db.Uuid
+  driverId       String? @map("driver_id") @db.Uuid
+  serialNo       String? @map("serial_no")
+  runId          String? @map("run_id")
   routeId    String?  @map("route_id") @db.Uuid
   deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
   deletedBy  String? @map("deleted_by") @db.Uuid

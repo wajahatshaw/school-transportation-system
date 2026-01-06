@@ -13,6 +13,8 @@ import {
 import { Input, Label } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { formatUsPhoneInput, validateUsPhone } from '@/lib/phone'
+import { TimePicker } from '@/components/TimePicker'
+import { normalizeTimeHHMM, validateTimeHHMM } from '@/lib/time'
 
 interface EditStudentModalProps {
   student: Student
@@ -22,7 +24,7 @@ interface EditStudentModalProps {
     lastName: string
     grade?: string
     studentAddress?: string | null
-    pickupAddress?: string | null
+    morningPickupTime?: string | null
     guardianName?: string | null
     guardianPhone?: string | null
     schoolName?: string | null
@@ -38,7 +40,7 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
     lastName: student.lastName,
     grade: student.grade || '',
     studentAddress: (student as any).studentAddress || '',
-    pickupAddress: (student as any).pickupAddress || '',
+    morningPickupTime: (student as any).morningPickupTime || '',
     guardianName: (student as any).guardianName || '',
     guardianPhone: (student as any).guardianPhone || '',
     schoolName: (student as any).schoolName || '',
@@ -62,6 +64,9 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
 
     const schoolPhoneCheck = validateUsPhone(formData.schoolPhone)
     if (!schoolPhoneCheck.ok) newErrors.schoolPhone = schoolPhoneCheck.error
+
+    const morningPickupCheck = validateTimeHHMM(formData.morningPickupTime)
+    if (!morningPickupCheck.ok) newErrors.morningPickupTime = morningPickupCheck.error
     
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -75,13 +80,14 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
     startTransition(async () => {
       const guardianPhoneCheck = validateUsPhone(formData.guardianPhone)
       const schoolPhoneCheck = validateUsPhone(formData.schoolPhone)
+      const morningPickup = normalizeTimeHHMM(formData.morningPickupTime)
 
       await onSave({
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         grade: formData.grade.trim() || undefined,
         studentAddress: formData.studentAddress.trim() || null,
-        pickupAddress: formData.pickupAddress.trim() || null,
+        morningPickupTime: morningPickup || null,
         guardianName: formData.guardianName.trim() || null,
         guardianPhone: guardianPhoneCheck.ok ? (guardianPhoneCheck.e164 || null) : null,
         schoolName: formData.schoolName.trim() || null,
@@ -113,7 +119,7 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent 
         onClose={onClose}
-        className="w-[92vw] max-w-[980px]"
+        className="w-[92vw] max-w-[980px] max-h-[90vh] overflow-hidden flex flex-col"
       >
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -129,8 +135,9 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* First Name */}
             <div className="space-y-2">
               <Label htmlFor="firstName" className="text-sm font-medium text-slate-700">
@@ -235,19 +242,23 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
               />
             </div>
 
-            {/* Pick-up Address */}
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="pickupAddress" className="text-sm font-medium text-slate-700">
-                Pick-up Address
-              </Label>
-              <Input
-                id="pickupAddress"
-                value={formData.pickupAddress}
-                onChange={(e) => handleChange('pickupAddress', e.target.value)}
-                placeholder="Pick-up location (if different)"
-                disabled={isPending}
-              />
+            {/* Schedule (Times) */}
+            <div className="md:col-span-2 pt-2">
+              <p className="text-sm font-medium text-slate-800">Schedule</p>
+              <p className="text-xs text-slate-500 mt-1">
+                All times use a consistent format (stored as <span className="font-mono">HH:mm</span>).
+              </p>
             </div>
+
+            <TimePicker
+              id="morningPickupTime"
+              label="Morning Pickup Time"
+              value={formData.morningPickupTime}
+              onChange={(v) => handleChange('morningPickupTime', v)}
+              disabled={isPending}
+              error={errors.morningPickupTime}
+              placeholder="Select morning pickup"
+            />
 
             {/* School Name */}
             <div className="space-y-2">
@@ -296,10 +307,11 @@ export function EditStudentModal({ student, onClose, onSave }: EditStudentModalP
                 disabled={isPending}
               />
             </div>
+            </div>
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t bg-white">
             <Button
               type="button"
               variant="outline"
