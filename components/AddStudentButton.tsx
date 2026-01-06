@@ -13,12 +13,16 @@ import {
 } from '@/components/ui/dialog'
 import { Input, Label } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { formatUsPhoneInput, validateUsPhone } from '@/lib/phone'
+import { TimePicker } from '@/components/TimePicker'
+import { normalizeTimeHHMM, validateTimeHHMM } from '@/lib/time'
 
 interface AddStudentButtonProps {
   onSuccess?: () => void
+  tenantName: string
 }
 
-export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
+export function AddStudentButton({ onSuccess, tenantName }: AddStudentButtonProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -26,6 +30,13 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
     firstName: '',
     lastName: '',
     grade: '',
+    studentAddress: '',
+    morningPickupTime: '',
+    guardianName: '',
+    guardianPhone: '',
+    schoolName: tenantName, // Pre-fill with tenant name
+    schoolAddress: '',
+    schoolPhone: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -38,6 +49,15 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
     if (!formData.lastName.trim()) {
       newErrors.lastName = 'Last name is required'
     }
+
+    const guardianPhoneCheck = validateUsPhone(formData.guardianPhone)
+    if (!guardianPhoneCheck.ok) newErrors.guardianPhone = guardianPhoneCheck.error
+
+    const schoolPhoneCheck = validateUsPhone(formData.schoolPhone)
+    if (!schoolPhoneCheck.ok) newErrors.schoolPhone = schoolPhoneCheck.error
+
+    const morningPickupCheck = validateTimeHHMM(formData.morningPickupTime)
+    if (!morningPickupCheck.ok) newErrors.morningPickupTime = morningPickupCheck.error
     
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -50,6 +70,10 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
 
     startTransition(async () => {
       try {
+        const guardianPhoneCheck = validateUsPhone(formData.guardianPhone)
+        const schoolPhoneCheck = validateUsPhone(formData.schoolPhone)
+        const morningPickup = normalizeTimeHHMM(formData.morningPickupTime)
+
         const response = await fetch('/api/students', {
           method: 'POST',
           headers: {
@@ -59,6 +83,13 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
             firstName: formData.firstName.trim(),
             lastName: formData.lastName.trim(),
             grade: formData.grade.trim() || undefined,
+            studentAddress: formData.studentAddress.trim() || undefined,
+            morningPickupTime: morningPickup || undefined,
+            guardianName: formData.guardianName.trim() || undefined,
+            guardianPhone: guardianPhoneCheck.ok ? (guardianPhoneCheck.e164 || undefined) : undefined,
+            schoolName: tenantName || undefined, // Always use tenant name
+            schoolAddress: formData.schoolAddress.trim() || undefined,
+            schoolPhone: schoolPhoneCheck.ok ? (schoolPhoneCheck.e164 || undefined) : undefined,
           }),
         })
 
@@ -71,7 +102,18 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
           description: `${formData.firstName} ${formData.lastName} has been added to the system.`
         })
         setIsOpen(false)
-        setFormData({ firstName: '', lastName: '', grade: '' })
+        setFormData({
+          firstName: '',
+          lastName: '',
+          grade: '',
+          studentAddress: '',
+          morningPickupTime: '',
+          guardianName: '',
+          guardianPhone: '',
+          schoolName: tenantName, // Reset to tenant name
+          schoolAddress: '',
+          schoolPhone: '',
+        })
         setErrors({})
         
         // Refresh the page data
@@ -95,10 +137,32 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
     }
   }
 
+  const handlePhoneChange = (field: 'guardianPhone' | 'schoolPhone', value: string) => {
+    const formatted = formatUsPhoneInput(value)
+    setFormData((prev) => ({ ...prev, [field]: formatted.display }))
+
+    const res = validateUsPhone(formatted.display)
+    setErrors((prev) => ({
+      ...prev,
+      [field]: res.ok ? '' : res.error,
+    }))
+  }
+
   const handleClose = () => {
     if (!isPending) {
       setIsOpen(false)
-      setFormData({ firstName: '', lastName: '', grade: '' })
+      setFormData({
+        firstName: '',
+        lastName: '',
+        grade: '',
+        studentAddress: '',
+        morningPickupTime: '',
+        guardianName: '',
+        guardianPhone: '',
+        schoolName: tenantName, // Reset to tenant name
+        schoolAddress: '',
+        schoolPhone: '',
+      })
       setErrors({})
     }
   }
@@ -113,9 +177,9 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent 
           onClose={handleClose}
-          className="sm:max-w-[500px]"
+          className="w-[95vw] sm:w-[92vw] max-w-[980px] max-h-[90vh] overflow-hidden flex flex-col"
         >
-          <DialogHeader>
+          <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6">
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
                 <User className="h-6 w-6 text-blue-600" />
@@ -129,8 +193,9 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
             </div>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-4 sm:space-y-6 pb-4 px-4 sm:px-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               {/* First Name */}
               <div className="space-y-2">
                 <Label htmlFor="firstName" className="text-sm font-medium text-slate-700">
@@ -184,12 +249,129 @@ export function AddStudentButton({ onSuccess }: AddStudentButtonProps) {
                     className="pl-10"
                   />
                 </div>
-                <p className="text-xs text-slate-500">Optional: Specify the student's grade level</p>
+                <p className="text-xs text-slate-500">Optional</p>
+              </div>
+
+              {/* Guardian Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="guardianPhone" className="text-sm font-medium text-slate-700">
+                  Parent/Guardian Phone
+                </Label>
+                <Input
+                  id="guardianPhone"
+                  value={formData.guardianPhone}
+                  onChange={(e) => handlePhoneChange('guardianPhone', e.target.value)}
+                  placeholder="+1 (248) 555-1212"
+                  disabled={isPending}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  className={errors.guardianPhone ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                />
+                {errors.guardianPhone && (
+                  <p className="text-sm text-red-600">{errors.guardianPhone}</p>
+                )}
+              </div>
+
+              {/* Guardian Name */}
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="guardianName" className="text-sm font-medium text-slate-700">
+                  Parent/Guardian Name
+                </Label>
+                <Input
+                  id="guardianName"
+                  value={formData.guardianName}
+                  onChange={(e) => handleChange('guardianName', e.target.value)}
+                  placeholder="Parent/guardian full name"
+                  disabled={isPending}
+                />
+              </div>
+
+              {/* Student Address */}
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="studentAddress" className="text-sm font-medium text-slate-700">
+                  Student Address
+                </Label>
+                <Input
+                  id="studentAddress"
+                  value={formData.studentAddress}
+                  onChange={(e) => handleChange('studentAddress', e.target.value)}
+                  placeholder="Home address"
+                  disabled={isPending}
+                />
+              </div>
+
+              {/* Schedule (Times) */}
+              <div className="md:col-span-2 pt-2">
+                <p className="text-sm font-medium text-slate-800">Schedule</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  All times use a consistent format (stored as <span className="font-mono">HH:mm</span>).
+                </p>
+              </div>
+
+              <TimePicker
+                id="morningPickupTime"
+                label="Morning Pickup Time"
+                value={formData.morningPickupTime}
+                onChange={(v) => handleChange('morningPickupTime', v)}
+                disabled={isPending}
+                error={errors.morningPickupTime}
+                placeholder="Select morning pickup"
+              />
+
+              {/* School Name */}
+              <div className="space-y-2">
+                <Label htmlFor="schoolName" className="text-sm font-medium text-slate-700">
+                  School Name
+                </Label>
+                <Input
+                  id="schoolName"
+                  value={formData.schoolName}
+                  readOnly
+                  disabled={true}
+                  className="bg-slate-50 cursor-not-allowed"
+                  title="School name is automatically set to your organization name"
+                />
+                <p className="text-xs text-slate-500">Automatically set to your organization name</p>
+              </div>
+
+              {/* School Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="schoolPhone" className="text-sm font-medium text-slate-700">
+                  School Phone
+                </Label>
+                <Input
+                  id="schoolPhone"
+                  value={formData.schoolPhone}
+                  onChange={(e) => handlePhoneChange('schoolPhone', e.target.value)}
+                  placeholder="+1 (248) 555-1212"
+                  disabled={isPending}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  className={errors.schoolPhone ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                />
+                {errors.schoolPhone && (
+                  <p className="text-sm text-red-600">{errors.schoolPhone}</p>
+                )}
+              </div>
+
+              {/* School Address */}
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="schoolAddress" className="text-sm font-medium text-slate-700">
+                  School Address
+                </Label>
+                <Input
+                  id="schoolAddress"
+                  value={formData.schoolAddress}
+                  onChange={(e) => handleChange('schoolAddress', e.target.value)}
+                  placeholder="School address"
+                  disabled={isPending}
+                />
+              </div>
               </div>
             </div>
 
             {/* Footer Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t">
+            <div className="flex items-center justify-end gap-3 pt-4 border-t bg-white mt-4 sticky bottom-0 z-10 px-4 sm:px-6 pb-4 sm:pb-6">
               <Button
                 type="button"
                 variant="outline"

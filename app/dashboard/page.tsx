@@ -2,14 +2,17 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import {
   GraduationCap,
+  School,
   Car,
-  AlertTriangle,
+  Route,
+  Bus,
   CheckCircle,
+  AlertTriangle,
   XCircle,
   TrendingUp,
   ArrowRight,
 } from 'lucide-react'
-import { getStudents, getDrivers } from '@/lib/actions'
+import { getRoutes, getStudents, getVehicles, getTenantsCount } from '@/lib/actions'
 import { withTenantContext, getTenantContext } from '@/lib/withTenantContext'
 import { getComplianceStatus } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -176,17 +179,57 @@ export default async function DashboardPage() {
 }
 
 async function MetricsCards() {
-  const [students, drivers, documents] = await Promise.all([
-    getStudents(),
-    getDrivers(),
-    getAllComplianceDocuments(),
+  const [students, routes, vehicles, tenantsCount] = await Promise.all([
+    getStudents(), 
+    getRoutes(), 
+    getVehicles(),
+    getTenantsCount()
   ])
-
-  const expiredDocs = documents.filter((d) => getComplianceStatus(d.expiresAt) === 'expired')
-  const expiringDocs = documents.filter((d) => getComplianceStatus(d.expiresAt) === 'expiring')
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Total Schools */}
+      <div className="bg-white rounded-lg border border-slate-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-600">Total Schools</p>
+            <p className="text-3xl font-bold text-slate-900 mt-2">{tenantsCount}</p>
+          </div>
+          <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <School className="h-6 w-6 text-indigo-600" />
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mt-4">Total schools in the system</p>
+      </div>
+
+      {/* Total Routes */}
+      <div className="bg-white rounded-lg border border-slate-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-600">Total Routes</p>
+            <p className="text-3xl font-bold text-slate-900 mt-2">{routes.length}</p>
+          </div>
+          <div className="h-12 w-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+            <Route className="h-6 w-6 text-emerald-600" />
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mt-4">Active route records</p>
+      </div>
+
+      {/* Total Vehicles */}
+      <div className="bg-white rounded-lg border border-slate-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-600">Total Vehicles</p>
+            <p className="text-3xl font-bold text-slate-900 mt-2">{vehicles.length}</p>
+          </div>
+          <div className="h-12 w-12 bg-amber-100 rounded-lg flex items-center justify-center">
+            <Bus className="h-6 w-6 text-amber-600" />
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mt-4">Active vehicle records</p>
+      </div>
+
       {/* Total Students */}
       <div className="bg-white rounded-lg border border-slate-200 p-6">
         <div className="flex items-center justify-between">
@@ -199,48 +242,6 @@ async function MetricsCards() {
           </div>
         </div>
         <p className="text-xs text-slate-500 mt-4">Active student records</p>
-      </div>
-
-      {/* Total Drivers */}
-      <div className="bg-white rounded-lg border border-slate-200 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-600">Total Drivers</p>
-            <p className="text-3xl font-bold text-slate-900 mt-2">{drivers.length}</p>
-          </div>
-          <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-            <Car className="h-6 w-6 text-green-600" />
-          </div>
-        </div>
-        <p className="text-xs text-slate-500 mt-4">Active driver records</p>
-      </div>
-
-      {/* Expired Documents */}
-      <div className="bg-white rounded-lg border border-slate-200 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-600">Expired Docs</p>
-            <p className="text-3xl font-bold text-red-600 mt-2">{expiredDocs.length}</p>
-          </div>
-          <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
-            <XCircle className="h-6 w-6 text-red-600" />
-          </div>
-        </div>
-        <p className="text-xs text-slate-500 mt-4">Require immediate attention</p>
-      </div>
-
-      {/* Expiring Soon */}
-      <div className="bg-white rounded-lg border border-slate-200 p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-slate-600">Expiring Soon</p>
-            <p className="text-3xl font-bold text-yellow-600 mt-2">{expiringDocs.length}</p>
-          </div>
-          <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-            <AlertTriangle className="h-6 w-6 text-yellow-600" />
-          </div>
-        </div>
-        <p className="text-xs text-slate-500 mt-4">Within 30 days</p>
       </div>
     </div>
   )
@@ -274,7 +275,7 @@ async function ComplianceAlerts() {
       <div className="space-y-3">
         {expiredDocs.map((doc) => (
           <div key={doc.id} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
-            <XCircle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <XCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900">
                 {doc.driver.firstName} {doc.driver.lastName}
@@ -293,7 +294,7 @@ async function ComplianceAlerts() {
 
         {expiringDocs.map((doc) => (
           <div key={doc.id} className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
-            <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900">
                 {doc.driver.firstName} {doc.driver.lastName}
@@ -336,7 +337,7 @@ async function RecentActivity() {
       <div className="space-y-3">
         {logs.map((log) => (
           <div key={log.id} className="flex items-start gap-3 py-2 border-b border-slate-100 last:border-0">
-            <div className="h-8 w-8 bg-slate-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="h-8 w-8 bg-slate-100 rounded-full flex items-center justify-center shrink-0">
               <TrendingUp className="h-4 w-4 text-slate-600" />
             </div>
             <div className="flex-1 min-w-0">

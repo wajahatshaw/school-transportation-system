@@ -42,6 +42,20 @@ model Student {
   firstName  String   @map("first_name")
   lastName   String   @map("last_name")
   grade      String?
+  studentAddress String? @map("student_address")
+  morningPickupTime    String? @map("morning_pickup_time")
+  morningDropTime      String? @map("morning_drop_time")
+  afternoonPickupTime  String? @map("afternoon_pickup_time")
+  afternoonDropTime    String? @map("afternoon_drop_time")
+  guardianName   String? @map("guardian_name")
+  guardianPhone  String? @map("guardian_phone")
+  schoolName     String? @map("school_name")
+  schoolAddress  String? @map("school_address")
+  schoolPhone    String? @map("school_phone")
+  vehicleId      String? @map("vehicle_id") @db.Uuid
+  driverId       String? @map("driver_id") @db.Uuid
+  serialNo       String? @map("serial_no")
+  runId          String? @map("run_id")
   routeId    String?  @map("route_id") @db.Uuid
   deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
   deletedBy  String? @map("deleted_by") @db.Uuid
@@ -126,6 +140,8 @@ model Vehicle {
   capacity      Int
   licensePlate  String?   @map("license_plate")
   vehicleType   String?   @map("vehicle_type")
+  manufactureYear Int?   @map("manufacture_year")
+  model         String?
   deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
   deletedBy     String?   @map("deleted_by") @db.Uuid
   createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -133,8 +149,27 @@ model Vehicle {
 
   tenant        Tenant    @relation(fields: [tenantId], references: [id])
   routes        Route[]
+  maintenances  VehicleMaintenanceDoc[]
 
   @@map("vehicles")
+}
+
+model VehicleMaintenanceDoc {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vehicleId         String    @map("vehicle_id") @db.Uuid
+  maintenanceDocUrl String?   @map("maintenance_doc_url")
+  notes             String?
+  scheduledDate     DateTime? @map("scheduled_date") @db.Date
+  maintenanceStatus String    @default("pending") @map("maintenance_status")
+  completedDate     DateTime? @map("completed_date") @db.Date
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+  deletedBy         String?   @map("deleted_by") @db.Uuid
+  createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  vehicle           Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@map("vehicle_maintenance_docs")
 }
 
 model Route {
