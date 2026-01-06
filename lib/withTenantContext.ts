@@ -86,6 +86,9 @@ export async function withTenantContext<T>(
     // Execute the callback with the transaction client
     // All queries here will be automatically scoped by RLS
     return await callback(tx)
+  }, {
+    timeout: 20000, // 20 seconds timeout to handle concurrent transactions
+    maxWait: 5000,  // Wait up to 5 seconds for a connection from the pool
   })
 }
 

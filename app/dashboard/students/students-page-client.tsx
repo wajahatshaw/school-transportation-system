@@ -2,15 +2,17 @@
 
 import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Student } from '@prisma/client'
+import { Driver, Student, Vehicle } from '@prisma/client'
 import { getStudents } from '@/lib/actions'
 import { StudentsTable } from '@/components/StudentsTable'
 
 interface StudentsPageClientProps {
   initialStudents: Student[]
+  drivers: Driver[]
+  vehicles: Vehicle[]
 }
 
-export function StudentsPageClient({ initialStudents }: StudentsPageClientProps) {
+export function StudentsPageClient({ initialStudents, drivers, vehicles }: StudentsPageClientProps) {
   const [students, setStudents] = useState(initialStudents)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
@@ -32,5 +34,5 @@ export function StudentsPageClient({ initialStudents }: StudentsPageClientProps)
     })
   }
 
-  return <StudentsTable students={students} onUpdate={handleUpdate} />
+  return <StudentsTable students={students} drivers={drivers} vehicles={vehicles} onUpdate={handleUpdate} />
 }
