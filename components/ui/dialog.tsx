@@ -42,10 +42,9 @@ const DialogContent = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      'relative w-full rounded-lg bg-white shadow-xl',
+      'relative w-full max-w-lg rounded-lg bg-white shadow-xl',
       'animate-in fade-in-0 zoom-in-95 duration-200',
-      'overflow-hidden', // Prevent content from overflowing rounded corners
-      'mx-auto', // Center the dialog
+      'mx-auto p-6', // Default padding and center
       className
     )}
     {...props}
