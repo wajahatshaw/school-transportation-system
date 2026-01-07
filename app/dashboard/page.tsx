@@ -12,7 +12,7 @@ import {
   TrendingUp,
   ArrowRight,
 } from 'lucide-react'
-import { getRoutes, getStudents, getVehicles, getTenantsCount } from '@/lib/actions'
+import { getRoutes, getStudents, getVehicles, getDrivers, getTenantsCount } from '@/lib/actions'
 import { withTenantContext, getTenantContext } from '@/lib/withTenantContext'
 import { getComplianceStatus } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
       <Suspense
         fallback={
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => (
+            {[...Array(5)].map((_, i) => (
               <CardSkeleton key={i} />
             ))}
           </div>
@@ -190,10 +190,11 @@ export default async function DashboardPage() {
 
 async function MetricsCards() {
   try {
-    const [students, routes, vehicles, tenantsCount] = await Promise.all([
+    const [students, routes, vehicles, drivers, tenantsCount] = await Promise.all([
       getStudents(), 
       getRoutes(), 
       getVehicles(),
+      getDrivers(),
       getTenantsCount()
     ])
 
@@ -254,6 +255,20 @@ async function MetricsCards() {
         </div>
         <p className="text-xs text-slate-500 mt-4">Active student records</p>
       </div>
+
+      {/* Total Drivers */}
+      <div className="bg-white rounded-lg border border-slate-200 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-600">Total Drivers</p>
+            <p className="text-3xl font-bold text-slate-900 mt-2">{drivers.length}</p>
+          </div>
+          <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+            <Car className="h-6 w-6 text-purple-600" />
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 mt-4">Active driver records</p>
+      </div>
     </div>
   )
   } catch (error) {
@@ -261,7 +276,7 @@ async function MetricsCards() {
     // Return error state instead of crashing
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[...Array(4)].map((_, i) => (
+        {[...Array(5)].map((_, i) => (
           <div key={i} className="bg-white rounded-lg border border-slate-200 p-6">
             <div className="flex items-center justify-between">
               <div>
