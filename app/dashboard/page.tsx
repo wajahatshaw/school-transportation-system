@@ -19,8 +19,9 @@ import { Button } from '@/components/ui/button'
 import { CardSkeleton } from '@/components/ui/skeleton'
 
 async function getAllComplianceDocuments() {
-  const context = await getTenantContext()
-  return await withTenantContext(context, async (tx) => {
+  try {
+    const context = await getTenantContext()
+    return await withTenantContext(context, async (tx) => {
     // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
     const docs = await tx.$queryRaw<Array<{
       id: string
@@ -66,12 +67,17 @@ async function getAllComplianceDocuments() {
         }
       })
       .filter((doc): doc is NonNullable<typeof doc> => doc !== null)
-  })
+    })
+  } catch (error) {
+    console.error('Error fetching compliance documents:', error)
+    return [] // Return empty array on error to prevent page crash
+  }
 }
 
 async function getRecentAuditLogs() {
-  const context = await getTenantContext()
-  return await withTenantContext(context, async (tx) => {
+  try {
+    const context = await getTenantContext()
+    return await withTenantContext(context, async (tx) => {
     // DATABASE-LEVEL: Using view for true database-enforced tenant isolation
     const logs = await tx.$queryRaw<Array<{
       id: string
@@ -102,7 +108,11 @@ async function getRecentAuditLogs() {
       ip: l.ip,
       createdAt: l.created_at
     }))
-  })
+    })
+  } catch (error) {
+    console.error('Error fetching audit logs:', error)
+    return [] // Return empty array on error to prevent page crash
+  }
 }
 
 export default async function DashboardPage() {
@@ -179,12 +189,13 @@ export default async function DashboardPage() {
 }
 
 async function MetricsCards() {
-  const [students, routes, vehicles, tenantsCount] = await Promise.all([
-    getStudents(), 
-    getRoutes(), 
-    getVehicles(),
-    getTenantsCount()
-  ])
+  try {
+    const [students, routes, vehicles, tenantsCount] = await Promise.all([
+      getStudents(), 
+      getRoutes(), 
+      getVehicles(),
+      getTenantsCount()
+    ])
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -245,11 +256,31 @@ async function MetricsCards() {
       </div>
     </div>
   )
+  } catch (error) {
+    console.error('Error loading metrics:', error)
+    // Return error state instead of crashing
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white rounded-lg border border-slate-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-600">Loading...</p>
+                <p className="text-3xl font-bold text-slate-400 mt-2">—</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-4">Unable to load data</p>
+          </div>
+        ))}
+      </div>
+    )
+  }
 }
 
 async function ComplianceAlerts() {
-  const documents = await getAllComplianceDocuments()
-  const expiredDocs = documents
+  try {
+    const documents = await getAllComplianceDocuments()
+    const expiredDocs = documents
     .filter((d) => getComplianceStatus(d.expiresAt) === 'expired')
     .slice(0, 5)
   const expiringDocs = documents
@@ -313,14 +344,19 @@ async function ComplianceAlerts() {
       </div>
     </div>
   )
+  } catch (error) {
+    console.error('Error loading compliance alerts:', error)
+    return null // Don't show section if there's an error
+  }
 }
 
 async function RecentActivity() {
-  const logs = await getRecentAuditLogs()
+  try {
+    const logs = await getRecentAuditLogs()
 
-  if (logs.length === 0) {
-    return null
-  }
+    if (logs.length === 0) {
+      return null
+    }
 
   return (
     <div className="bg-white rounded-lg border border-slate-200 p-6">
@@ -354,4 +390,8 @@ async function RecentActivity() {
       </div>
     </div>
   )
+  } catch (error) {
+    console.error('Error loading recent activity:', error)
+    return null // Don't show section if there's an error
+  }
 }

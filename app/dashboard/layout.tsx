@@ -20,7 +20,14 @@ export default async function DashboardLayout({
     redirect('/select-tenant')
   }
   
-  const tenant = await getCurrentTenant()
+  let tenant
+  try {
+    tenant = await getCurrentTenant()
+  } catch (error) {
+    console.error('Error fetching tenant:', error)
+    // Continue with undefined tenant - will use fallback name
+    tenant = null
+  }
 
   return (
     <DataCacheProvider>
