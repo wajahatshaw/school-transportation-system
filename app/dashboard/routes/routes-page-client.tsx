@@ -16,8 +16,8 @@ type Vehicle = {
   vehicleType: string | null
   deletedAt: Date | null
   deletedBy: string | null
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | null
+  updatedAt: Date | null
 }
 
 type Driver = {
@@ -28,8 +28,8 @@ type Driver = {
   licenseNumber: string | null
   deletedAt: Date | null
   deletedBy: string | null
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | null
+  updatedAt: Date | null
 }
 
 type Route = {
@@ -42,8 +42,8 @@ type Route = {
   stops: any
   deletedAt: Date | null
   deletedBy: string | null
-  createdAt: Date
-  updatedAt: Date
+  createdAt: Date | null
+  updatedAt: Date | null
 }
 
 interface RouteWithRelations extends Route {

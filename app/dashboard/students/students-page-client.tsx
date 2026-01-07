@@ -1,13 +1,19 @@
 'use client'
 
 import { useCallback } from 'react'
-import { Student } from '@prisma/client'
+import { Driver, Student, Vehicle } from '@prisma/client'
 import { getStudents } from '@/lib/actions'
 import { StudentsTable } from '@/components/StudentsTable'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { TableSkeleton } from '@/components/ui/skeleton'
 
-export function StudentsPageClient() {
+interface StudentsPageClientProps {
+  drivers: Driver[]
+  vehicles: Vehicle[]
+  tenantName: string
+}
+
+export function StudentsPageClient({ drivers, vehicles, tenantName }: StudentsPageClientProps) {
   const queryClient = useQueryClient()
 
   const studentsQuery = useQuery<Student[]>({
@@ -28,5 +34,5 @@ export function StudentsPageClient() {
     return <TableSkeleton />
   }
 
-  return <StudentsTable students={studentsQuery.data ?? []} onUpdate={handleUpdate} />
+  return <StudentsTable students={studentsQuery.data ?? []} drivers={drivers} vehicles={vehicles} onUpdate={handleUpdate} tenantName={tenantName} />
 }

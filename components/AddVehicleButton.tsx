@@ -28,6 +28,8 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
     capacity: '',
     licensePlate: '',
     vehicleType: '',
+    manufactureYear: '',
+    model: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -69,6 +71,8 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
             capacity: parseInt(formData.capacity),
             licensePlate: formData.licensePlate.trim() || undefined,
             vehicleType: formData.vehicleType.trim() || undefined,
+            manufactureYear: formData.manufactureYear.trim() ? parseInt(formData.manufactureYear) : undefined,
+            model: formData.model.trim() || undefined,
           }),
         })
 
@@ -81,7 +85,7 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
           description: `${formData.name} has been added to the system.`
         })
         setIsOpen(false)
-        setFormData({ name: '', capacity: '', licensePlate: '', vehicleType: '' })
+        setFormData({ name: '', capacity: '', licensePlate: '', vehicleType: '', manufactureYear: '', model: '' })
         setErrors({})
         
         if (onSuccess) {
@@ -108,7 +112,7 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
   const handleClose = () => {
     if (!isPending) {
       setIsOpen(false)
-      setFormData({ name: '', capacity: '', licensePlate: '', vehicleType: '' })
+      setFormData({ name: '', capacity: '', licensePlate: '', vehicleType: '', manufactureYear: '', model: '' })
       setErrors({})
     }
   }
@@ -212,6 +216,40 @@ export function AddVehicleButton({ onSuccess }: AddVehicleButtonProps) {
                   className="font-mono"
                 />
                 <p className="text-xs text-slate-500">Optional: Vehicle registration plate number</p>
+              </div>
+
+              {/* Manufacture Year */}
+              <div className="space-y-2">
+                <Label htmlFor="manufactureYear" className="text-sm font-medium text-slate-700">
+                  Manufacture Year
+                </Label>
+                <Input
+                  id="manufactureYear"
+                  type="number"
+                  min="1900"
+                  max={new Date().getFullYear() + 1}
+                  step="1"
+                  value={formData.manufactureYear}
+                  onChange={(e) => handleChange('manufactureYear', e.target.value)}
+                  placeholder="e.g., 2020"
+                  disabled={isPending}
+                />
+                <p className="text-xs text-slate-500">Optional: Year the vehicle was manufactured</p>
+              </div>
+
+              {/* Model */}
+              <div className="space-y-2">
+                <Label htmlFor="model" className="text-sm font-medium text-slate-700">
+                  Model
+                </Label>
+                <Input
+                  id="model"
+                  value={formData.model}
+                  onChange={(e) => handleChange('model', e.target.value)}
+                  placeholder="e.g., Transit, Express, Sprinter"
+                  disabled={isPending}
+                />
+                <p className="text-xs text-slate-500">Optional: Vehicle model name</p>
               </div>
             </div>
 

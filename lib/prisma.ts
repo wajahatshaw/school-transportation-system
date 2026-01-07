@@ -32,10 +32,10 @@ function createPrismaClient() {
     const max = Number.isFinite(desiredMax) ? Math.min(Math.max(desiredMax, 1), 10) : 4
     globalForPool.pool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max, // Allow concurrent transactions (cap to avoid exhausting Supabase poolers)
+      max: 10, // Increased to handle concurrent dashboard queries (Supabase session pooler limit is typically 15+)
       min: 0, // Allow pool to close idle connections
       idleTimeoutMillis: 30000, // Close idle connections after 30s
-      connectionTimeoutMillis: 10000, // Wait up to 10s for a connection
+      connectionTimeoutMillis: 15000, // Wait up to 15s for a connection (increased from 10s)
       allowExitOnIdle: true, // Allow process to exit when pool is idle
     })
   }

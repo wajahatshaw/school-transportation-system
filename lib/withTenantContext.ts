@@ -89,13 +89,11 @@ export async function withTenantContext<T>(
     
     // Execute the callback with the transaction client
     // All queries here will be automatically scoped by RLS
-      return await callback(tx)
-    },
-    {
-      maxWait: Number(process.env.PRISMA_TX_MAX_WAIT_MS || 10000),
-      timeout: Number(process.env.PRISMA_TX_TIMEOUT_MS || 20000),
-    }
-  )
+    return await callback(tx)
+  }, {
+    timeout: 20000, // 20 seconds timeout to handle concurrent transactions
+    maxWait: 5000,  // Wait up to 5 seconds for a connection from the pool
+  })
 }
 
 /**

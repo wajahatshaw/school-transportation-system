@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Student } from '@prisma/client'
+import { Driver, Student, Vehicle } from '@prisma/client'
 import { Pencil, Trash2 } from 'lucide-react'
 import { updateStudent, softDeleteStudent } from '@/lib/actions'
 import { toast } from 'sonner'
@@ -10,22 +10,42 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { EditStudentModal } from './EditStudentModal'
 import { DeleteConfirmDialog } from './DeleteConfirmDialog'
+import { formatTimeLabel } from '@/lib/time'
+import { formatUsPhoneInput } from '@/lib/phone'
 
 interface StudentsTableProps {
   students: Student[]
+  drivers: Driver[]
+  vehicles: Vehicle[]
   onUpdate?: () => void
+  tenantName?: string
 }
 
-export function StudentsTable({ students, onUpdate }: StudentsTableProps) {
+export function StudentsTable({ students, drivers, vehicles, onUpdate, tenantName = '' }: StudentsTableProps) {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null)
   const [deletingStudent, setDeletingStudent] = useState<Student | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  const driversById = new Map(drivers.map((d) => [d.id, d]))
+  const vehiclesById = new Map(vehicles.map((v) => [v.id, v]))
 
   const handleEdit = (student: Student) => {
     setEditingStudent(student)
   }
 
-  const handleUpdate = async (data: { firstName: string; lastName: string; grade?: string; routeId?: string | null }) => {
+  const handleUpdate = async (data: {
+    firstName: string
+    lastName: string
+    grade?: string
+    studentAddress?: string | null
+    morningPickupTime?: string | null
+    guardianName?: string | null
+    guardianPhone?: string | null
+    schoolName?: string | null
+    schoolAddress?: string | null
+    routeId?: string | null 
+    schoolPhone?: string | null
+  }) => {
     if (!editingStudent) return
 
     setEditingStudent(null)
@@ -86,24 +106,58 @@ export function StudentsTable({ students, onUpdate }: StudentsTableProps) {
 
   return (
     <>
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden w-full">
+        <div className="overflow-x-auto w-full">
+          <div className="inline-block min-w-full align-middle">
+            <table className="min-w-[1200px] w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  First Name
+                  Serial #
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Last Name
+                  Run ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Student Name
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Grade
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Home Address
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Parent Phone
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Morning Pickup
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Afternoon Pickup
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Afternoon Drop
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  School Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  School Address
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  School Phone
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Bus Number
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                  Driver
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider w-[220px]">
                   Actions
                 </th>
               </tr>
@@ -115,21 +169,90 @@ export function StudentsTable({ students, onUpdate }: StudentsTableProps) {
                   className="transition-all duration-200 hover:bg-slate-50"
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-900">{student.firstName}</div>
+                    <div className="text-sm text-slate-900">{student.serialNo || '—'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-900">{student.lastName}</div>
+                    <div className="text-sm text-slate-900">{student.runId || '—'}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-slate-900">
+                      {student.firstName} {student.lastName}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-slate-500">{student.grade || 'N/A'}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div
+                      className="text-sm text-slate-700 max-w-[260px] truncate"
+                      title={student.studentAddress ?? ''}
+                    >
+                      {student.studentAddress || '—'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-slate-700">
+                      {student.guardianPhone ? formatUsPhoneInput(student.guardianPhone).display : '—'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-slate-700">
+                      {student.morningPickupTime ? formatTimeLabel(student.morningPickupTime) : '—'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-slate-700">
+                      {student.afternoonPickupTime ? formatTimeLabel(student.afternoonPickupTime) : '—'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-slate-700">
+                      {student.afternoonDropTime ? formatTimeLabel(student.afternoonDropTime) : '—'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-slate-700">{student.schoolName || '—'}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div
+                      className="text-sm text-slate-700 max-w-[260px] truncate"
+                      title={student.schoolAddress ?? ''}
+                    >
+                      {student.schoolAddress || '—'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-slate-700">
+                      {student.schoolPhone ? formatUsPhoneInput(student.schoolPhone).display : '—'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {(() => {
+                      const v = student.vehicleId ? vehiclesById.get(student.vehicleId) : undefined
+                      return (
+                        <div className="text-sm text-slate-700">
+                          {v?.licensePlate || '—'}
+                        </div>
+                      )
+                    })()}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {(() => {
+                      const d = student.driverId ? driversById.get(student.driverId) : undefined
+                      return (
+                        <div className="text-sm text-slate-700">
+                          {d?.firstName || '—'}
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <Badge variant={student.deletedAt ? 'danger' : 'success'}>
                       {student.deletedAt ? 'Deleted' : 'Active'}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium w-[220px]">
+                    <div className="flex items-center justify-center gap-3">
                       <Button
                         onClick={() => handleEdit(student)}
                         variant="ghost"
@@ -156,6 +279,7 @@ export function StudentsTable({ students, onUpdate }: StudentsTableProps) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
 
@@ -164,6 +288,7 @@ export function StudentsTable({ students, onUpdate }: StudentsTableProps) {
           student={editingStudent}
           onClose={() => setEditingStudent(null)}
           onSave={handleUpdate}
+          tenantName={tenantName}
         />
       )}
 
