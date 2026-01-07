@@ -21,7 +21,7 @@ import { normalizeTimeHHMM, validateTimeHHMM } from '@/lib/time'
 
 interface AddStudentButtonProps {
   onSuccess?: () => void
-  tenantName: string
+  tenantName?: string
 }
 
 export function AddStudentButton({ onSuccess, tenantName }: AddStudentButtonProps) {

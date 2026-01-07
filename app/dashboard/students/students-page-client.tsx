@@ -2,26 +2,33 @@
 
 import { useCallback } from 'react'
 import { Driver, Student, Vehicle } from '@prisma/client'
-import { getStudents } from '@/lib/actions'
+import { getStudents, getDrivers, getVehicles, getCurrentTenant } from '@/lib/actions'
 import { StudentsTable } from '@/components/StudentsTable'
+import { AddStudentButton } from '@/components/AddStudentButton'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { TableSkeleton } from '@/components/ui/skeleton'
 
-interface StudentsPageClientProps {
-  drivers: Driver[]
-  vehicles: Vehicle[]
-  tenantName: string
-}
-
-export function StudentsPageClient({ drivers, vehicles, tenantName }: StudentsPageClientProps) {
+export function StudentsPageClient() {
   const queryClient = useQueryClient()
 
   const studentsQuery = useQuery<Student[]>({
     queryKey: ['students'],
-    queryFn: async () => {
-      const data = await getStudents()
-      return data as unknown as Student[]
-    },
+    queryFn: getStudents as any,
+  })
+
+  const driversQuery = useQuery<Driver[]>({
+    queryKey: ['drivers'],
+    queryFn: getDrivers as any,
+  })
+
+  const vehiclesQuery = useQuery<Vehicle[]>({
+    queryKey: ['vehicles'],
+    queryFn: getVehicles as any,
+  })
+
+  const tenantQuery = useQuery({
+    queryKey: ['current-tenant'],
+    queryFn: getCurrentTenant,
   })
 
   const handleUpdate = useCallback(() => {
@@ -30,9 +37,28 @@ export function StudentsPageClient({ drivers, vehicles, tenantName }: StudentsPa
     queryClient.invalidateQueries({ queryKey: ['routes'] })
   }, [queryClient])
 
-  if (studentsQuery.isLoading && !studentsQuery.data) {
+  const isLoading = 
+    (studentsQuery.isLoading && !studentsQuery.data) ||
+    (driversQuery.isLoading && !driversQuery.data) ||
+    (vehiclesQuery.isLoading && !vehiclesQuery.data) ||
+    (tenantQuery.isLoading && !tenantQuery.data)
+
+  if (isLoading) {
     return <TableSkeleton />
   }
 
-  return <StudentsTable students={studentsQuery.data ?? []} drivers={drivers} vehicles={vehicles} onUpdate={handleUpdate} tenantName={tenantName} />
+  return (
+    <>
+      <div className="flex items-center justify-end mb-4">
+        <AddStudentButton tenantName={tenantQuery.data?.name} />
+      </div>
+      <StudentsTable 
+        students={studentsQuery.data ?? []} 
+        drivers={driversQuery.data ?? []} 
+        vehicles={vehiclesQuery.data ?? []} 
+        onUpdate={handleUpdate} 
+        tenantName={tenantQuery.data?.name || ''} 
+      />
+    </>
+  )
 }
