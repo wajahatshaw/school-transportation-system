@@ -3,7 +3,10 @@
 import Link from 'next/link'
 import {
   GraduationCap,
+  School,
   Car,
+  Route,
+  Bus,
   AlertTriangle,
   CheckCircle,
   XCircle,
@@ -28,7 +31,7 @@ export function DashboardPageClient() {
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[...Array(4)].map((_, i) => (
+          {[...Array(5)].map((_, i) => (
             <CardSkeleton key={i} />
           ))}
         </div>
@@ -42,6 +45,49 @@ export function DashboardPageClient() {
     <div className="space-y-8">
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Schools */}
+        <div className="bg-white rounded-lg border border-slate-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Total Schools</p>
+              <p className="text-3xl font-bold text-slate-900 mt-2">{data?.tenantsCount ?? 0}</p>
+            </div>
+            <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <School className="h-6 w-6 text-indigo-600" />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-4">Total schools in the system</p>
+        </div>
+
+        {/* Total Routes */}
+        <div className="bg-white rounded-lg border border-slate-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Total Routes</p>
+              <p className="text-3xl font-bold text-slate-900 mt-2">{data?.routesCount ?? 0}</p>
+            </div>
+            <div className="h-12 w-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+              <Route className="h-6 w-6 text-emerald-600" />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-4">Active route records</p>
+        </div>
+
+        {/* Total Vehicles */}
+        <div className="bg-white rounded-lg border border-slate-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Total Vehicles</p>
+              <p className="text-3xl font-bold text-slate-900 mt-2">{data?.vehiclesCount ?? 0}</p>
+            </div>
+            <div className="h-12 w-12 bg-amber-100 rounded-lg flex items-center justify-center">
+              <Bus className="h-6 w-6 text-amber-600" />
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-4">Active vehicle records</p>
+        </div>
+
+        {/* Total Students */}
         <div className="bg-white rounded-lg border border-slate-200 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -55,43 +101,18 @@ export function DashboardPageClient() {
           <p className="text-xs text-slate-500 mt-4">Active student records</p>
         </div>
 
+        {/* Total Drivers */}
         <div className="bg-white rounded-lg border border-slate-200 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600">Total Drivers</p>
               <p className="text-3xl font-bold text-slate-900 mt-2">{data?.driversCount ?? 0}</p>
             </div>
-            <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <Car className="h-6 w-6 text-green-600" />
+            <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <Car className="h-6 w-6 text-purple-600" />
             </div>
           </div>
           <p className="text-xs text-slate-500 mt-4">Active driver records</p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-slate-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Expired Docs</p>
-              <p className="text-3xl font-bold text-red-600 mt-2">{data?.complianceCounts.expired ?? 0}</p>
-            </div>
-            <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <XCircle className="h-6 w-6 text-red-600" />
-            </div>
-          </div>
-          <p className="text-xs text-slate-500 mt-4">Require immediate attention</p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-slate-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Expiring Soon</p>
-              <p className="text-3xl font-bold text-yellow-600 mt-2">{data?.complianceCounts.expiring ?? 0}</p>
-            </div>
-            <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="h-6 w-6 text-yellow-600" />
-            </div>
-          </div>
-          <p className="text-xs text-slate-500 mt-4">Within 30 days</p>
         </div>
       </div>
 

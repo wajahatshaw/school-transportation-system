@@ -739,9 +739,12 @@ export async function getDashboardData() {
   const context = await getTenantContext()
 
   return await withTenantContext(context, async (tx) => {
-    const [studentsCountRows, driversCountRows, complianceCountsRows, recentLogs] = await Promise.all([
+    const [studentsCountRows, driversCountRows, routesCountRows, vehiclesCountRows, tenantsCountRows, complianceCountsRows, recentLogs] = await Promise.all([
       tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM app.v_students`,
       tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM app.v_drivers`,
+      tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM app.v_routes`,
+      tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM app.v_vehicles`,
+      tx.$queryRaw<Array<{ count: bigint }>>`SELECT COUNT(*) as count FROM public.tenants`,
       tx.$queryRaw<Array<{ expired: bigint; expiring: bigint; valid: bigint }>>`
         SELECT
           COUNT(*) FILTER (WHERE expires_at::date < CURRENT_DATE) AS expired,
@@ -768,6 +771,9 @@ export async function getDashboardData() {
 
     const studentsCount = Number(studentsCountRows[0]?.count || 0)
     const driversCount = Number(driversCountRows[0]?.count || 0)
+    const routesCount = Number(routesCountRows[0]?.count || 0)
+    const vehiclesCount = Number(vehiclesCountRows[0]?.count || 0)
+    const tenantsCount = Number(tenantsCountRows[0]?.count || 0)
     const expiredCount = Number(complianceCountsRows[0]?.expired || 0)
     const expiringCount = Number(complianceCountsRows[0]?.expiring || 0)
     const validCount = Number(complianceCountsRows[0]?.valid || 0)
@@ -805,6 +811,9 @@ export async function getDashboardData() {
     return {
       studentsCount,
       driversCount,
+      routesCount,
+      vehiclesCount,
+      tenantsCount,
       complianceCounts: {
         expired: expiredCount,
         expiring: expiringCount,
