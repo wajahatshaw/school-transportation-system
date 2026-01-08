@@ -52,6 +52,11 @@ export function ComplianceDocumentsTable({
         queryClient.invalidateQueries({ queryKey: ['compliance-documents', driverId] })
         queryClient.invalidateQueries({ queryKey: ['compliance-overview'] })
         queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+        // Invalidate alert-related queries to update notification badge
+        queryClient.invalidateQueries({ queryKey: ['compliance-alert-count'] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-expiring-documents'] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-summary'] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-drivers'] })
       } catch (error) {
         setDocuments((prev) => prev.map((d) => (d.id === editingDoc.id ? editingDoc : d)))
         toast.error('Failed to update document')
@@ -72,6 +77,11 @@ export function ComplianceDocumentsTable({
         queryClient.invalidateQueries({ queryKey: ['compliance-documents', driverId] })
         queryClient.invalidateQueries({ queryKey: ['compliance-overview'] })
         queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+        // Invalidate alert-related queries to update notification badge
+        queryClient.invalidateQueries({ queryKey: ['compliance-alert-count'] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-expiring-documents'] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-summary'] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-drivers'] })
       } catch (error) {
         setDocuments((prev) => [...prev, deletingDoc])
         toast.error('Failed to delete document')

@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { Plus, Loader2, FileText, Calendar } from 'lucide-react'
 import { createComplianceDocument } from '@/lib/actions'
 import { toast } from 'sonner'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { Input, Label } from '@/components/ui/input'
+import { Input, Label, Select } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 interface AddComplianceDocumentButtonProps {
@@ -25,17 +25,40 @@ export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentB
   const [isPending, startTransition] = useTransition()
   const [formData, setFormData] = useState({
     docType: '',
+    customDocType: '',
     issuedAt: '',
     expiresAt: '',
     fileUrl: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [showCustomInput, setShowCustomInput] = useState(false)
+
+  // Fetch required document types
+  const { data: complianceRules } = useQuery({
+    queryKey: ['compliance-rules'],
+    queryFn: async () => {
+      const res = await fetch('/api/compliance/rules')
+      if (!res.ok) throw new Error('Failed to fetch compliance rules')
+      const data = await res.json()
+      return data.data || []
+    },
+    enabled: isOpen, // Only fetch when modal is open
+  })
+
+  // Get required document types from rules
+  const requiredDocTypes = complianceRules
+    ?.filter((rule: any) => rule.required)
+    .map((rule: any) => rule.docType) || ['Driver License', 'Background Check']
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
     
-    if (!formData.docType.trim()) {
+    const selectedDocType = showCustomInput ? formData.customDocType.trim() : formData.docType
+    if (!selectedDocType) {
       newErrors.docType = 'Document type is required'
+    }
+    if (showCustomInput && !formData.customDocType.trim()) {
+      newErrors.customDocType = 'Please enter a custom document type'
     }
     if (!formData.expiresAt) {
       newErrors.expiresAt = 'Expiry date is required'
@@ -52,23 +75,30 @@ export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentB
 
     startTransition(async () => {
       try {
+        const selectedDocType = showCustomInput ? formData.customDocType.trim() : formData.docType
         await createComplianceDocument({
           driverId,
-          docType: formData.docType.trim(),
+          docType: selectedDocType,
           issuedAt: formData.issuedAt ? new Date(formData.issuedAt) : undefined,
           expiresAt: new Date(formData.expiresAt),
           fileUrl: formData.fileUrl.trim() || undefined,
         })
         toast.success('Document added successfully', {
-          description: `${formData.docType} has been added to the driver's compliance records.`
+          description: `${selectedDocType} has been added to the driver's compliance records.`
         })
         setIsOpen(false)
-        setFormData({ docType: '', issuedAt: '', expiresAt: '', fileUrl: '' })
+        setFormData({ docType: '', customDocType: '', issuedAt: '', expiresAt: '', fileUrl: '' })
+        setShowCustomInput(false)
         setErrors({})
         // Invalidate caches so UI updates everywhere
         queryClient.invalidateQueries({ queryKey: ['compliance-documents', driverId] })
         queryClient.invalidateQueries({ queryKey: ['compliance-overview'] })
         queryClient.invalidateQueries({ queryKey: ['audit-logs'] })
+        // Invalidate alert-related queries to update notification badge
+        queryClient.invalidateQueries({ queryKey: ['compliance-alert-count'] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-expiring-documents'] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-summary'] })
+        queryClient.invalidateQueries({ queryKey: ['compliance-drivers'] })
       } catch (error) {
         toast.error('Failed to add document', {
           description: 'Please try again or contact support if the problem persists.'
@@ -84,10 +114,24 @@ export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentB
     }
   }
 
+  const handleDocTypeChange = (value: string) => {
+    if (value === 'custom') {
+      setShowCustomInput(true)
+      setFormData({ ...formData, docType: 'custom', customDocType: '' })
+    } else {
+      setShowCustomInput(false)
+      setFormData({ ...formData, docType: value, customDocType: '' })
+    }
+    if (errors.docType || errors.customDocType) {
+      setErrors({ ...errors, docType: '', customDocType: '' })
+    }
+  }
+
   const handleClose = () => {
     if (!isPending) {
       setIsOpen(false)
-      setFormData({ docType: '', issuedAt: '', expiresAt: '', fileUrl: '' })
+      setFormData({ docType: '', customDocType: '', issuedAt: '', expiresAt: '', fileUrl: '' })
+      setShowCustomInput(false)
       setErrors({})
     }
   }
@@ -126,18 +170,40 @@ export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentB
                   Document Type <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
-                  <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input
+                  <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 z-10" />
+                  <Select
                     id="docType"
-                    value={formData.docType}
-                    onChange={(e) => handleChange('docType', e.target.value)}
-                    placeholder="e.g., Driver's License, Medical Certificate"
+                    value={showCustomInput ? 'custom' : formData.docType}
+                    onChange={(e) => handleDocTypeChange(e.target.value)}
                     disabled={isPending}
-                    className={`pl-10 ${errors.docType ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                    className={`pl-10 appearance-none ${errors.docType ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                     autoFocus
-                  />
+                  >
+                    <option value="">Select a document type...</option>
+                    {requiredDocTypes.map((docType: string) => (
+                      <option key={docType} value={docType}>
+                        {docType}
+                      </option>
+                    ))}
+                    <option value="custom">Custom (Enter your own)</option>
+                  </Select>
                 </div>
-                {errors.docType && (
+                {showCustomInput && (
+                  <div className="mt-2">
+                    <Input
+                      id="customDocType"
+                      value={formData.customDocType}
+                      onChange={(e) => handleChange('customDocType', e.target.value)}
+                      placeholder="Enter custom document type..."
+                      disabled={isPending}
+                      className={errors.customDocType ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                    />
+                    {errors.customDocType && (
+                      <p className="text-sm text-red-600 mt-1">{errors.customDocType}</p>
+                    )}
+                  </div>
+                )}
+                {errors.docType && !showCustomInput && (
                   <p className="text-sm text-red-600">{errors.docType}</p>
                 )}
               </div>

@@ -20,6 +20,9 @@ model Tenant {
   routes                      Route[]
   routeTrips                  RouteTrip[]
   attendanceRecords           AttendanceRecord[]
+  complianceRules             ComplianceRule[]
+  complianceSnapshots         ComplianceSnapshot[]
+  complianceAlerts            ComplianceAlert[]
 
   @@map("tenants")
 }
@@ -105,6 +108,9 @@ model DriverComplianceDocument {
   issuedAt  DateTime? @map("issued_at") @db.Date
   expiresAt DateTime  @map("expires_at") @db.Date
   fileUrl   String?   @map("file_url")
+  status    String?   @default("valid") @map("status")
+  uploadedBy String?  @map("uploaded_by") @db.Uuid
+  notes     String?   @map("notes") @db.Text
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
   deletedBy String? @map("deleted_by") @db.Uuid
   createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -131,6 +137,61 @@ model AuditLog {
   tenant    Tenant @relation(fields: [tenantId], references: [id])
 
   @@map("audit_logs")
+}
+
+model ComplianceRule {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  role            String   @default("driver")
+  docType         String   @map("doc_type")
+  required        Boolean  @default(true)
+  graceDays       Int      @default(0) @map("grace_days")
+  alertWindowsJson Json?   @map("alert_windows_json") @db.JsonB
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  tenant          Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, role, docType])
+  @@map("compliance_rules")
+}
+
+model ComplianceSnapshot {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  driverId        String?  @map("driver_id") @db.Uuid
+  complianceScore Decimal? @map("compliance_score") @db.Decimal(5, 2)
+  compliant       Boolean  @default(false)
+  expiredCount    Int      @default(0) @map("expired_count")
+  expiringCount   Int      @default(0) @map("expiring_count")
+  missingCount    Int      @default(0) @map("missing_count")
+  computedAt      DateTime @default(now()) @map("computed_at") @db.Timestamptz(6)
+  detailsJson     Json?    @map("details_json") @db.JsonB
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant          Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, driverId, computedAt])
+  @@map("compliance_snapshots")
+}
+
+model ComplianceAlert {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  driverId        String   @map("driver_id") @db.Uuid
+  docId           String?  @map("doc_id") @db.Uuid
+  alertType       String   @map("alert_type")
+  alertWindowDays Int      @map("alert_window_days")
+  sentAt          DateTime? @map("sent_at") @db.Timestamptz(6)
+  channel         String?  @map("channel")
+  dedupeKey       String   @unique @map("dedupe_key")
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant          Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, driverId, alertType])
+  @@index([dedupeKey])
+  @@map("compliance_alerts")
 }
 
 model User {

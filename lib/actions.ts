@@ -470,6 +470,8 @@ export async function createComplianceDocument(data: {
   issuedAt?: Date
   expiresAt: Date
   fileUrl?: string
+  status?: string
+  notes?: string
 }) {
   const context = await getTenantContext()
   
@@ -481,9 +483,31 @@ export async function createComplianceDocument(data: {
         docType: data.docType,
         issuedAt: data.issuedAt,
         expiresAt: data.expiresAt,
-        fileUrl: data.fileUrl
+        fileUrl: data.fileUrl,
+        status: data.status || 'valid',
+        uploadedBy: context.userId,
+        notes: data.notes
       }
     })
+    
+    // Log to audit_logs
+    await tx.$executeRaw`
+      INSERT INTO audit_logs (
+        tenant_id, table_name, record_id, action, after, user_id
+      )
+      VALUES (
+        ${context.tenantId}::uuid,
+        'driver_compliance_documents',
+        ${doc.id}::uuid,
+        'create',
+        ${JSON.stringify({
+          driverId: doc.driverId,
+          docType: doc.docType,
+          expiresAt: doc.expiresAt
+        })}::jsonb,
+        ${context.userId}::uuid
+      )
+    `
     
     revalidatePath(`/dashboard/drivers/${data.driverId}/compliance`)
     revalidatePath('/dashboard/compliance')
@@ -496,7 +520,7 @@ export async function createComplianceDocument(data: {
 
 export async function updateComplianceDocument(
   id: string,
-  data: { docType: string; issuedAt?: Date; expiresAt: Date; fileUrl?: string }
+  data: { docType: string; issuedAt?: Date; expiresAt: Date; fileUrl?: string; status?: string; notes?: string }
 ) {
   const context = await getTenantContext()
   
@@ -509,15 +533,45 @@ export async function updateComplianceDocument(
       throw new Error('Document not found or access denied')
     }
     
+    const beforeData = {
+      docType: existing.docType,
+      expiresAt: existing.expiresAt,
+      status: existing.status,
+      notes: existing.notes
+    }
+    
     const doc = await tx.driverComplianceDocument.update({
       where: { id },
       data: {
         docType: data.docType,
         issuedAt: data.issuedAt,
         expiresAt: data.expiresAt,
-        fileUrl: data.fileUrl
+        fileUrl: data.fileUrl,
+        status: data.status,
+        notes: data.notes
       }
     })
+    
+    // Log to audit_logs
+    await tx.$executeRaw`
+      INSERT INTO audit_logs (
+        tenant_id, table_name, record_id, action, before, after, user_id
+      )
+      VALUES (
+        ${context.tenantId}::uuid,
+        'driver_compliance_documents',
+        ${doc.id}::uuid,
+        'update',
+        ${JSON.stringify(beforeData)}::jsonb,
+        ${JSON.stringify({
+          docType: doc.docType,
+          expiresAt: doc.expiresAt,
+          status: doc.status,
+          notes: doc.notes
+        })}::jsonb,
+        ${context.userId}::uuid
+      )
+    `
     
     revalidatePath(`/dashboard/drivers/${doc.driverId}/compliance`)
     revalidatePath('/dashboard/compliance')
@@ -541,6 +595,12 @@ export async function deleteComplianceDocument(id: string) {
       throw new Error('Document not found or access denied')
     }
     
+    const beforeData = {
+      docType: doc.docType,
+      driverId: doc.driverId,
+      expiresAt: doc.expiresAt
+    }
+    
     // Soft delete using UPDATE, not DELETE
     await tx.driverComplianceDocument.update({
       where: { id },
@@ -549,6 +609,22 @@ export async function deleteComplianceDocument(id: string) {
         deletedBy: context.userId
       }
     })
+    
+    // Log to audit_logs
+    await tx.$executeRaw`
+      INSERT INTO audit_logs (
+        tenant_id, table_name, record_id, action, before, after, user_id
+      )
+      VALUES (
+        ${context.tenantId}::uuid,
+        'driver_compliance_documents',
+        ${doc.id}::uuid,
+        'delete',
+        ${JSON.stringify(beforeData)}::jsonb,
+        ${JSON.stringify({ deletedAt: new Date().toISOString() })}::jsonb,
+        ${context.userId}::uuid
+      )
+    `
     
     revalidatePath(`/dashboard/drivers/${doc.driverId}/compliance`)
     revalidatePath('/dashboard/compliance')
