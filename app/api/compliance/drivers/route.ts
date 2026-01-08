@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { evaluateDriver } from '@/lib/compliance/rules'
+import { evaluateDriversBatch } from '@/lib/compliance/rules'
 import { withTenantContext, getTenantContext } from '@/lib/withTenantContext'
 
 export async function GET(request: NextRequest) {
@@ -33,44 +33,12 @@ export async function GET(request: NextRequest) {
       }>>(driversQuery, ...params)
     })
     
-    // Evaluate each driver's compliance in batches to avoid transaction pool exhaustion
-    // Process in batches of 5 to avoid overwhelming the connection pool
-    const batchSize = 5
-    const evaluations: Array<{
-      driverId: string
-      compliant: boolean
-      complianceScore: number
-      expiredCount: number
-      expiringCount: number
-      missingCount: number
-      documents: any[]
-      missingRequiredDocs: string[]
-    }> = []
+    // OPTIMIZED: Evaluate all drivers in one batch query instead of per-driver
+    const driverIds = drivers.map(d => d.id)
+    const evaluationsMap = await evaluateDriversBatch(driverIds)
     
-    for (let i = 0; i < drivers.length; i += batchSize) {
-      const batch = drivers.slice(i, i + batchSize)
-      const batchResults = await Promise.all(
-        batch.map(async (d) => {
-          try {
-            return await evaluateDriver(d.id)
-          } catch (error) {
-            console.error(`Error evaluating driver ${d.id}:`, error)
-            // Return a default non-compliant evaluation if evaluation fails
-            return {
-              driverId: d.id,
-              compliant: false,
-              complianceScore: 0,
-              expiredCount: 0,
-              expiringCount: 0,
-              missingCount: 0,
-              documents: [],
-              missingRequiredDocs: []
-            }
-          }
-        })
-      )
-      evaluations.push(...batchResults)
-    }
+    // Convert map to array
+    const evaluations = Array.from(evaluationsMap.values())
     
     // Filter by driverId if provided
     let filteredEvaluations = driverId

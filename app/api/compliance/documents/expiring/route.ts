@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { evaluateDriver } from '@/lib/compliance/rules'
+import { evaluateDriversBatch } from '@/lib/compliance/rules'
 import { withTenantContext, getTenantContext } from '@/lib/withTenantContext'
 
 export async function GET(request: NextRequest) {
@@ -32,8 +32,11 @@ export async function GET(request: NextRequest) {
       }>>(driversQuery, ...params)
     })
     
-    // Evaluate each driver's compliance in batches
-    const batchSize = 5
+    // OPTIMIZED: Evaluate all drivers in one batch query instead of per-driver
+    const driverIds = drivers.map(d => d.id)
+    const evaluationsMap = await evaluateDriversBatch(driverIds)
+    
+    // Extract documents from evaluations
     const allDocuments: Array<{
       docId: string
       driverId: string
@@ -51,51 +54,33 @@ export async function GET(request: NextRequest) {
       isRequired: boolean
     }> = []
     
-    for (let i = 0; i < drivers.length; i += batchSize) {
-      const batch = drivers.slice(i, i + batchSize)
-      const batchResults = await Promise.all(
-        batch.map(async (d) => {
-          try {
-            const evaluation = await evaluateDriver(d.id)
-            return {
-              driver: {
-                id: d.id,
-                firstName: d.first_name,
-                lastName: d.last_name,
-                email: d.email,
-                licenseNumber: d.license_number
-              },
-              evaluation
-            }
-          } catch (error) {
-            console.error(`Error evaluating driver ${d.id}:`, error)
-            return null
-          }
-        })
-      )
+    drivers.forEach((d) => {
+      const evaluation = evaluationsMap.get(d.id)
+      if (!evaluation) return
       
-      // Extract documents from evaluations
-      for (const result of batchResults) {
-        if (!result) continue
-        
-        for (const doc of result.evaluation.documents) {
-          // Only include expired or expiring documents that are REQUIRED
-          // This matches the logic in evaluateTenant() and getDocumentsForAlerts()
-          if ((doc.status === 'expired' || doc.status === 'expiring') && doc.isRequired) {
-            allDocuments.push({
-              docId: doc.docId,
-              driverId: result.driver.id,
-              driver: result.driver,
-              docType: doc.docType,
-              expiresAt: new Date(doc.expiresAt),
-              daysUntilExpiry: doc.daysUntilExpiry,
-              status: doc.status,
-              isRequired: doc.isRequired
-            })
-          }
+      for (const doc of evaluation.documents) {
+        // Only include expired or expiring documents that are REQUIRED
+        // This matches the logic in evaluateTenant() and getDocumentsForAlerts()
+        if ((doc.status === 'expired' || doc.status === 'expiring') && doc.isRequired) {
+          allDocuments.push({
+            docId: doc.docId,
+            driverId: d.id,
+            driver: {
+              id: d.id,
+              firstName: d.first_name,
+              lastName: d.last_name,
+              email: d.email,
+              licenseNumber: d.license_number
+            },
+            docType: doc.docType,
+            expiresAt: new Date(doc.expiresAt),
+            daysUntilExpiry: doc.daysUntilExpiry,
+            status: doc.status,
+            isRequired: doc.isRequired
+          })
         }
       }
-    }
+    })
     
     // Apply filter - ensure we're filtering correctly
     let filteredDocuments = allDocuments

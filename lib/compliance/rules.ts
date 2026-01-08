@@ -133,8 +133,9 @@ export async function getComplianceRules(role: string = 'driver', existingTx?: a
 
 /**
  * Evaluate a single document's compliance status
+ * OPTIMIZED: Made synchronous since it doesn't need async operations
  */
-export async function evaluateDocument(
+export function evaluateDocument(
   doc: {
     id: string
     docType: string
@@ -142,7 +143,7 @@ export async function evaluateDocument(
     status?: string | null
   },
   rules: ComplianceRule[]
-): Promise<DocumentEvaluation> {
+): DocumentEvaluation {
   const expiresAt = new Date(doc.expiresAt)
   const now = new Date()
   const daysUntilExpiry = Math.floor((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -234,31 +235,28 @@ export async function evaluateDriver(driverId: string, existingTx?: any): Promis
         AND deleted_at IS NULL
     `
     
-    // Evaluate each document
-    // Match rules by doc type (case-insensitive)
-    const documentEvaluations = await Promise.all(
-      docs.map((doc: {
-        id: string
-        doc_type: string
-        expires_at: Date
-        status: string | null
-      }) => {
-        // Find matching rule (case-insensitive)
-        const matchingRule = rules.find(
-          r => r.docType.trim().toLowerCase() === doc.doc_type?.trim().toLowerCase()
-        )
-        
-        return evaluateDocument(
-          {
-            id: doc.id,
-            docType: matchingRule?.docType || doc.doc_type, // Use rule's docType for consistency
-            expiresAt: doc.expires_at,
-            status: doc.status
-          },
-          rules
-        )
-      })
-    )
+    // Evaluate each document (now synchronous, no Promise.all needed)
+    const documentEvaluations = docs.map((doc: {
+      id: string
+      doc_type: string
+      expires_at: Date
+      status: string | null
+    }) => {
+      // Find matching rule (case-insensitive)
+      const matchingRule = rules.find(
+        r => r.docType.trim().toLowerCase() === doc.doc_type?.trim().toLowerCase()
+      )
+      
+      return evaluateDocument(
+        {
+          id: doc.id,
+          docType: matchingRule?.docType || doc.doc_type, // Use rule's docType for consistency
+          expiresAt: doc.expires_at,
+          status: doc.status
+        },
+        rules
+      )
+    })
     
     // Find missing required documents
     // Normalize doc types for comparison (case-insensitive, trim whitespace)
@@ -334,6 +332,167 @@ export async function evaluateDriver(driverId: string, existingTx?: any): Promis
       documents: documentEvaluations,
       missingRequiredDocs
     }
+  }
+  
+  // If an existing transaction is provided, use it (avoid nesting)
+  if (existingTx) {
+    return await evaluate(existingTx)
+  }
+  
+  // Otherwise create a new transaction context
+  return await withTenantContext(context, evaluate)
+}
+
+/**
+ * Batch evaluate multiple drivers at once (OPTIMIZED)
+ * Fetches all documents in one query, then evaluates in memory
+ */
+export async function evaluateDriversBatch(
+  driverIds: string[],
+  existingTx?: any
+): Promise<Map<string, DriverEvaluation>> {
+  const context = await getTenantContext()
+  
+  const evaluate = async (tx: any) => {
+    if (driverIds.length === 0) {
+      return new Map<string, DriverEvaluation>()
+    }
+    
+    // Get compliance rules
+    const rules = await getComplianceRules('driver', tx)
+    
+    // Fetch ALL documents for ALL drivers in ONE query (major optimization)
+    const placeholders = driverIds.map((_, i) => `$${i + 1}::uuid`).join(', ')
+    const allDocs = await tx.$queryRawUnsafe(
+      `SELECT 
+        id, 
+        driver_id, 
+        doc_type, 
+        expires_at, 
+        COALESCE(status, 'valid') as status
+      FROM driver_compliance_documents
+      WHERE driver_id IN (${placeholders})
+        AND tenant_id = app.get_current_tenant_id()
+        AND deleted_at IS NULL`,
+      ...driverIds
+    ) as Array<{
+      id: string
+      driver_id: string
+      doc_type: string
+      expires_at: Date
+      status: string | null
+    }>
+    
+    // Group documents by driver
+    const docsByDriver = new Map<string, Array<{
+      id: string
+      doc_type: string
+      expires_at: Date
+      status: string | null
+    }>>()
+    
+    allDocs.forEach((doc: {
+      id: string
+      driver_id: string
+      doc_type: string
+      expires_at: Date
+      status: string | null
+    }) => {
+      if (!docsByDriver.has(doc.driver_id)) {
+        docsByDriver.set(doc.driver_id, [])
+      }
+      docsByDriver.get(doc.driver_id)!.push({
+        id: doc.id,
+        doc_type: doc.doc_type,
+        expires_at: doc.expires_at,
+        status: doc.status
+      })
+    })
+    
+    // Evaluate all drivers (synchronous, no async needed)
+    const results = new Map<string, DriverEvaluation>()
+    
+    driverIds.forEach((driverId) => {
+      const driverDocs = docsByDriver.get(driverId) || []
+      
+      // Evaluate each document (synchronous)
+      const documentEvaluations = driverDocs.map((doc) => {
+        const matchingRule = rules.find(
+          r => r.docType.trim().toLowerCase() === doc.doc_type?.trim().toLowerCase()
+        )
+        
+        return evaluateDocument(
+          {
+            id: doc.id,
+            docType: matchingRule?.docType || doc.doc_type,
+            expiresAt: doc.expires_at,
+            status: doc.status
+          },
+          rules
+        )
+      })
+      
+      // Find missing required documents
+      const existingDocTypes = new Set(
+        driverDocs.map(d => d.doc_type?.trim().toLowerCase() || '')
+      )
+      const requiredDocTypesList = rules
+        .filter((r: ComplianceRule) => r.required)
+        .map((r: ComplianceRule) => r.docType)
+      const missingRequiredDocs = requiredDocTypesList.filter(
+        (docType: string) => !existingDocTypes.has(docType?.trim().toLowerCase() || '')
+      )
+      
+      // Count statuses (only for required documents)
+      const expiredCount = documentEvaluations.filter(
+        (d: DocumentEvaluation) => d.status === 'expired' && d.isRequired
+      ).length
+      const expiringCount = documentEvaluations.filter(
+        (d: DocumentEvaluation) => d.status === 'expiring' && d.isRequired
+      ).length
+      const missingCount = missingRequiredDocs.length
+      
+      // Calculate compliance score
+      const totalRequired = requiredDocTypesList.length
+      
+      if (totalRequired === 0) {
+        results.set(driverId, {
+          driverId,
+          compliant: true,
+          complianceScore: 100,
+          expiredCount: 0,
+          expiringCount: 0,
+          missingCount: 0,
+          documents: documentEvaluations,
+          missingRequiredDocs: []
+        })
+        return
+      }
+      
+      const validRequiredDocs = documentEvaluations.filter(
+        (d: DocumentEvaluation) => d.isRequired && d.status === 'valid'
+      ).length
+      
+      const complianceScore = Math.max(0, Math.round((validRequiredDocs / totalRequired) * 100))
+      
+      const compliant = 
+        missingCount === 0 && 
+        expiredCount === 0 && 
+        complianceScore === 100
+      
+      results.set(driverId, {
+        driverId,
+        compliant,
+        complianceScore,
+        expiredCount,
+        expiringCount,
+        missingCount,
+        documents: documentEvaluations,
+        missingRequiredDocs
+      })
+    })
+    
+    return results
   }
   
   // If an existing transaction is provided, use it (avoid nesting)
@@ -428,90 +587,86 @@ export async function evaluateTenant(): Promise<TenantEvaluation> {
       })
     })
     
-    // Evaluate all drivers in parallel (now safe since we're not making DB calls per driver)
-    const evaluations = await Promise.all(
-      driverIds.map(async (driverId) => {
-        const driverDocs = docsByDriver.get(driverId) || []
-        
-        // Evaluate each document
-        const documentEvaluations = await Promise.all(
-          driverDocs.map(async (doc) => {
-            // Find matching rule (case-insensitive)
-            const matchingRule = rules.find(
-              r => r.docType.trim().toLowerCase() === doc.doc_type?.trim().toLowerCase()
-            )
-            
-            return await evaluateDocument(
-              {
-                id: doc.id,
-                docType: matchingRule?.docType || doc.doc_type,
-                expiresAt: doc.expires_at,
-                status: doc.status
-              },
-              rules
-            )
-          })
+    // Evaluate all drivers (now synchronous, no Promise.all needed)
+    const evaluations = driverIds.map((driverId) => {
+      const driverDocs = docsByDriver.get(driverId) || []
+      
+      // Evaluate each document (synchronous now)
+      const documentEvaluations = driverDocs.map((doc) => {
+        // Find matching rule (case-insensitive)
+        const matchingRule = rules.find(
+          r => r.docType.trim().toLowerCase() === doc.doc_type?.trim().toLowerCase()
         )
         
-        // Find missing required documents
-        const existingDocTypes = new Set(
-          driverDocs.map(d => d.doc_type?.trim().toLowerCase() || '')
+        return evaluateDocument(
+          {
+            id: doc.id,
+            docType: matchingRule?.docType || doc.doc_type,
+            expiresAt: doc.expires_at,
+            status: doc.status
+          },
+          rules
         )
-        const requiredDocTypesList = rules
-          .filter((r: ComplianceRule) => r.required)
-          .map((r: ComplianceRule) => r.docType)
-        const missingRequiredDocs = requiredDocTypesList.filter(
-          (docType: string) => !existingDocTypes.has(docType?.trim().toLowerCase() || '')
-        )
-        
-        // Count statuses (only for required documents)
-        const expiredCount = documentEvaluations.filter(
-          (d: DocumentEvaluation) => d.status === 'expired' && d.isRequired
-        ).length
-        const expiringCount = documentEvaluations.filter(
-          (d: DocumentEvaluation) => d.status === 'expiring' && d.isRequired
-        ).length
-        const missingCount = missingRequiredDocs.length
-        
-        // Calculate compliance score
-        const totalRequired = requiredDocTypesList.length
-        
-        if (totalRequired === 0) {
-          return {
-            driverId,
-            compliant: true,
-            complianceScore: 100,
-            expiredCount: 0,
-            expiringCount: 0,
-            missingCount: 0,
-            documents: documentEvaluations,
-            missingRequiredDocs: []
-          }
-        }
-        
-        const validRequiredDocs = documentEvaluations.filter(
-          (d: DocumentEvaluation) => d.isRequired && d.status === 'valid'
-        ).length
-        
-        const complianceScore = Math.max(0, Math.round((validRequiredDocs / totalRequired) * 100))
-        
-        const compliant = 
-          missingCount === 0 && 
-          expiredCount === 0 && 
-          complianceScore === 100
-        
+      })
+      
+      // Find missing required documents
+      const existingDocTypes = new Set(
+        driverDocs.map(d => d.doc_type?.trim().toLowerCase() || '')
+      )
+      const requiredDocTypesList = rules
+        .filter((r: ComplianceRule) => r.required)
+        .map((r: ComplianceRule) => r.docType)
+      const missingRequiredDocs = requiredDocTypesList.filter(
+        (docType: string) => !existingDocTypes.has(docType?.trim().toLowerCase() || '')
+      )
+      
+      // Count statuses (only for required documents)
+      const expiredCount = documentEvaluations.filter(
+        (d: DocumentEvaluation) => d.status === 'expired' && d.isRequired
+      ).length
+      const expiringCount = documentEvaluations.filter(
+        (d: DocumentEvaluation) => d.status === 'expiring' && d.isRequired
+      ).length
+      const missingCount = missingRequiredDocs.length
+      
+      // Calculate compliance score
+      const totalRequired = requiredDocTypesList.length
+      
+      if (totalRequired === 0) {
         return {
           driverId,
-          compliant,
-          complianceScore,
-          expiredCount,
-          expiringCount,
-          missingCount,
+          compliant: true,
+          complianceScore: 100,
+          expiredCount: 0,
+          expiringCount: 0,
+          missingCount: 0,
           documents: documentEvaluations,
-          missingRequiredDocs
+          missingRequiredDocs: []
         }
-      })
-    )
+      }
+      
+      const validRequiredDocs = documentEvaluations.filter(
+        (d: DocumentEvaluation) => d.isRequired && d.status === 'valid'
+      ).length
+      
+      const complianceScore = Math.max(0, Math.round((validRequiredDocs / totalRequired) * 100))
+      
+      const compliant = 
+        missingCount === 0 && 
+        expiredCount === 0 && 
+        complianceScore === 100
+      
+      return {
+        driverId,
+        compliant,
+        complianceScore,
+        expiredCount,
+        expiringCount,
+        missingCount,
+        documents: documentEvaluations,
+        missingRequiredDocs
+      }
+    })
     
     // Aggregate statistics
     const compliantDrivers = evaluations.filter(e => e.compliant).length
