@@ -1,6 +1,5 @@
 import { CompliancePageClient } from './compliance-page-client'
 import { ComplianceAlertsBadge } from './compliance-alerts-badge'
-import { InitializeComplianceButton } from '@/components/InitializeComplianceButton'
 
 export default async function CompliancePage() {
   return (
@@ -11,7 +10,6 @@ export default async function CompliancePage() {
           <p className="text-slate-600 mt-1">Monitor driver compliance documents and expiration dates</p>
         </div>
         <div className="flex items-center gap-3">
-          <InitializeComplianceButton />
           <ComplianceAlertsBadge />
         </div>
       </div>
