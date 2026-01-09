@@ -69,11 +69,19 @@ export function ComplianceExpiringTable({ summary }: ComplianceExpiringTableProp
   const { data: response, isLoading, isFetching, error } = useQuery({
     queryKey: ['compliance-expiring-documents', filter],
     queryFn: () => fetchExpiringDocuments(filter),
-    // Don't use initialData - let React Query handle cache naturally
-    // This ensures isLoading/isFetching are true when filter changes and no cache exists
-    refetchInterval: 30000, // Refetch every 30 seconds to catch newly expired documents
-    staleTime: 10000, // Consider data stale after 10 seconds
-    // Ensure query refetches when filter changes
+    // Only use placeholderData if it's for the exact same query key (same filter)
+    // This prevents showing wrong data when filter changes
+    placeholderData: (previousData) => {
+      // Check if we have cached data for the CURRENT filter
+      const cachedData = queryClient.getQueryData(['compliance-expiring-documents', filter])
+      // Only use cached data if it exists for this exact filter
+      return cachedData || undefined
+    },
+    staleTime: 0, // Always consider data stale to allow background refetch
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnMount: 'always', // Always refetch on mount (in background if data exists)
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchInterval: 30000, // Refetch every 30 seconds in background to catch newly expired documents
     enabled: true,
   })
   
@@ -81,11 +89,10 @@ export function ComplianceExpiringTable({ summary }: ComplianceExpiringTableProp
   const expiredCount = response?.expired || 0
   const expiringCount = response?.expiring || 0
   
-  // Show skeleton when fetching new data (filter changed) OR when pending without data
-  // isLoading = waiting for initial data (new query key, no cache)
-  // isFetching = actively fetching (could be new query or background refetch)
-  // Show skeleton when loading OR when fetching and no response data yet
-  const showSkeleton = isLoading || (isFetching && !response)
+  // Show skeleton when fetching AND we don't have data for the CURRENT filter
+  // This ensures we show loader when filter changes, not wrong cached data
+  const hasDataForCurrentFilter = response !== undefined
+  const showSkeleton = (isLoading || isFetching) && !hasDataForCurrentFilter
   
   return (
     <div ref={sectionRef} className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">

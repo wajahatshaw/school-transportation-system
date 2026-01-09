@@ -59,14 +59,13 @@ export function CompliancePageClient() {
   const summaryQuery = useQuery({
     queryKey: ['compliance-summary'],
     queryFn: fetchComplianceSummary,
-    // CRITICAL: Use cache immediately on mount if available
-    initialData: () => {
-      return queryClient.getQueryData(['compliance-summary']) as any
-    },
-    initialDataUpdatedAt: () => {
-      return queryClient.getQueryState(['compliance-summary'])?.dataUpdatedAt
-    },
+    // Show cached data immediately, refetch in background
     placeholderData: (previousData) => previousData,
+    staleTime: 0, // Always consider data stale to allow background refetch
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnMount: 'always', // Always refetch on mount (in background if data exists)
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchInterval: 60000, // Refetch every 60 seconds in background
     retry: 1,
   })
   
@@ -76,8 +75,18 @@ export function CompliancePageClient() {
       statusFilter === 'all' ? undefined : statusFilter,
       searchQuery || undefined
     ),
-    // Don't use initialData - let React Query handle cache naturally
-    // This ensures isPending is true when query key changes and no cache exists
+    // Only use placeholderData if it's for the exact same query key
+    // This prevents showing wrong data when filter/search changes
+    placeholderData: (previousData) => {
+      // Check if we have cached data for the CURRENT query key (current filter + search)
+      const cachedData = queryClient.getQueryData(['compliance-drivers', statusFilter, searchQuery])
+      // Only use cached data if it exists for this exact filter/search combination
+      return cachedData || undefined
+    },
+    staleTime: 0, // Always consider data stale to allow background refetch
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnMount: 'always', // Always refetch on mount (in background if data exists)
+    refetchOnWindowFocus: true, // Refetch when window regains focus
     retry: 1,
   })
   
@@ -89,15 +98,16 @@ export function CompliancePageClient() {
     console.error('Error fetching driver compliance:', driversQuery.error)
   }
   
-  // Show loading when fetching (including when filters change)
+  // Show loading only when we don't have any data (initial load)
+  // If we have cached data, show it immediately and refetch in background
   const hasSummaryData = !!summaryQuery.data
-  const summaryLoading = (summaryQuery.isFetching && !hasSummaryData) || (summaryQuery.isPending && !hasSummaryData)
+  const summaryLoading = summaryQuery.isPending && !hasSummaryData
   
-  // For drivers: show skeleton when fetching new data (filter/search changed)
-  // isPending = waiting for initial data (new query key, no cache)
-  // isFetching = actively fetching (could be new query or background refetch)
-  // Show skeleton when pending (new query) OR when fetching and we don't have data yet
-  const driversLoading = driversQuery.isPending || (driversQuery.isFetching && driversQuery.data === undefined)
+  // For drivers: show skeleton when fetching AND we don't have data for the CURRENT filter
+  // Check if we have cached data for the exact current query key (filter + search)
+  const hasDriversDataForCurrentFilter = driversQuery.data !== undefined
+  // Show loader if we're fetching and don't have data for this specific filter
+  const driversLoading = (driversQuery.isPending || driversQuery.isFetching) && !hasDriversDataForCurrentFilter
   
   const summary = summaryQuery.data
   

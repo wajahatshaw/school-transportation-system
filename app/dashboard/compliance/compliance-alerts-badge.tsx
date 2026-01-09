@@ -26,17 +26,22 @@ export function ComplianceAlertsBadge() {
   const { data: alertCount, isLoading } = useQuery({
     queryKey: ['compliance-alert-count'],
     queryFn: fetchAlertCount,
-    refetchInterval: 30000, // Refetch every 30 seconds to catch newly expired documents
-    staleTime: 10000, // Consider data stale after 10 seconds
-    // Invalidate when expiring documents are refetched to keep in sync
-    refetchOnWindowFocus: true,
+    // Show cached data immediately, refetch in background
+    placeholderData: (previousData) => previousData,
+    staleTime: 0, // Always consider data stale to allow background refetch
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchOnMount: 'always', // Always refetch on mount (in background if data exists)
+    refetchOnWindowFocus: true, // Refetch when window regains focus
+    refetchInterval: 30000, // Refetch every 30 seconds in background to catch newly expired documents
   })
 
   const totalAlerts = alertCount?.total || 0
   const expiredCount = alertCount?.expired || 0
   const expiringCount = alertCount?.expiring || 0
 
-  if (isLoading) {
+  // Only show loading state if we don't have any cached data
+  // If cached data exists, show it immediately and refetch in background
+  if (isLoading && !alertCount) {
     return (
       <div className="relative">
         <Bell className="h-6 w-6 text-slate-600" />
