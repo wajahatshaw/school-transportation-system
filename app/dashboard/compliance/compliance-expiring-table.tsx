@@ -7,7 +7,7 @@ import { AlertTriangle, ExternalLink } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 
 interface ComplianceSummary {
@@ -54,6 +54,18 @@ export function ComplianceExpiringTable({ summary }: ComplianceExpiringTableProp
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<DocumentFilter>('all')
   
+  // Use ref to allow scrolling to this section
+  const sectionRef = useRef<HTMLDivElement>(null)
+  
+  // Expose scroll function via window for alert badge to use
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).scrollToExpiringDocuments = () => {
+        sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+  }, [])
+  
   const { data: response, isLoading, isFetching, error } = useQuery({
     queryKey: ['compliance-expiring-documents', filter],
     queryFn: () => fetchExpiringDocuments(filter),
@@ -76,7 +88,7 @@ export function ComplianceExpiringTable({ summary }: ComplianceExpiringTableProp
   const showSkeleton = isLoading || (isFetching && !response)
   
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+    <div ref={sectionRef} className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-slate-900">Expiring & Expired Documents</h2>
       </div>

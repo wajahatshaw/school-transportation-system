@@ -64,6 +64,16 @@ export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentB
       newErrors.expiresAt = 'Expiry date is required'
     }
     
+    // Validate that issue date is before expiry date
+    if (formData.issuedAt && formData.expiresAt) {
+      const issuedDate = new Date(formData.issuedAt)
+      const expiryDate = new Date(formData.expiresAt)
+      if (issuedDate >= expiryDate) {
+        newErrors.issuedAt = 'Issue date must be before expiry date'
+        newErrors.expiresAt = 'Expiry date must be after issue date'
+      }
+    }
+    
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -221,10 +231,15 @@ export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentB
                     value={formData.issuedAt}
                     onChange={(e) => handleChange('issuedAt', e.target.value)}
                     disabled={isPending}
-                    className="pl-10"
+                    className={`pl-10 ${errors.issuedAt ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   />
                 </div>
-                <p className="text-xs text-slate-500">Optional: When was this document issued?</p>
+                {errors.issuedAt && (
+                  <p className="text-sm text-red-600">{errors.issuedAt}</p>
+                )}
+                {!errors.issuedAt && (
+                  <p className="text-xs text-slate-500">Optional: When was this document issued?</p>
+                )}
               </div>
 
               {/* Expiry Date */}
@@ -245,6 +260,9 @@ export function AddComplianceDocumentButton({ driverId }: AddComplianceDocumentB
                 </div>
                 {errors.expiresAt && (
                   <p className="text-sm text-red-600">{errors.expiresAt}</p>
+                )}
+                {!errors.expiresAt && (
+                  <p className="text-xs text-slate-500">When does this document expire?</p>
                 )}
               </div>
 

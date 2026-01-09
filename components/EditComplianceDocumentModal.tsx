@@ -49,6 +49,7 @@ export function EditComplianceDocumentModal({
     fileUrl: document.fileUrl || '',
   })
   const [showCustomInput, setShowCustomInput] = useState(isCustomType)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const handleDocTypeChange = (value: string) => {
     if (value === 'custom') {
@@ -62,10 +63,29 @@ export function EditComplianceDocumentModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const newErrors: Record<string, string> = {}
+    
     const selectedDocType = showCustomInput ? formData.customDocType.trim() : formData.docType
     if (!selectedDocType) {
+      newErrors.docType = 'Document type is required'
+    }
+    
+    // Validate that issue date is before expiry date
+    if (formData.issuedAt && formData.expiresAt) {
+      const issuedDate = new Date(formData.issuedAt)
+      const expiryDate = new Date(formData.expiresAt)
+      if (issuedDate >= expiryDate) {
+        newErrors.issuedAt = 'Issue date must be before expiry date'
+        newErrors.expiresAt = 'Expiry date must be after issue date'
+      }
+    }
+    
+    setErrors(newErrors)
+    
+    if (Object.keys(newErrors).length > 0) {
       return
     }
+    
     onSave({
       docType: selectedDocType,
       issuedAt: formData.issuedAt ? new Date(formData.issuedAt) : undefined,
@@ -115,8 +135,17 @@ export function EditComplianceDocumentModal({
                 id="issuedAt"
                 type="date"
                 value={formData.issuedAt}
-                onChange={(e) => setFormData({ ...formData, issuedAt: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, issuedAt: e.target.value })
+                  if (errors.issuedAt) {
+                    setErrors({ ...errors, issuedAt: '', expiresAt: '' })
+                  }
+                }}
+                className={errors.issuedAt ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {errors.issuedAt && (
+                <p className="text-sm text-red-600">{errors.issuedAt}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="expiresAt">Expiry Date *</Label>
@@ -124,9 +153,18 @@ export function EditComplianceDocumentModal({
                 id="expiresAt"
                 type="date"
                 value={formData.expiresAt}
-                onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, expiresAt: e.target.value })
+                  if (errors.expiresAt) {
+                    setErrors({ ...errors, issuedAt: '', expiresAt: '' })
+                  }
+                }}
                 required
+                className={errors.expiresAt ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {errors.expiresAt && (
+                <p className="text-sm text-red-600">{errors.expiresAt}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="fileUrl">File URL</Label>

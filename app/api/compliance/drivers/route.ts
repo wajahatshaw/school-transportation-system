@@ -17,9 +17,49 @@ export async function GET(request: NextRequest) {
       let paramIndex = 1
       
       if (search) {
-        driversQuery += ` AND (first_name ILIKE $${paramIndex} OR last_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`
-        params.push(`%${search}%`)
-        paramIndex++
+        // Improved search: check individual fields AND combined full name
+        // Also split search term to match parts across first_name and last_name
+        const searchPattern = `%${search}%`
+        const searchTerms = search.trim().split(/\s+/).filter(term => term.length > 0)
+        
+        if (searchTerms.length > 1) {
+          // Multiple words: check if they match first_name and last_name in any order
+          // e.g., "jack 02" matches first_name="Jack" AND last_name="02" (or vice versa)
+          const conditions: string[] = []
+          
+          // Check full search term against combined names
+          conditions.push(`CONCAT(first_name, ' ', last_name) ILIKE $${paramIndex}`)
+          conditions.push(`CONCAT(last_name, ' ', first_name) ILIKE $${paramIndex}`)
+          
+          // Check individual fields
+          conditions.push(`first_name ILIKE $${paramIndex}`)
+          conditions.push(`last_name ILIKE $${paramIndex}`)
+          conditions.push(`email ILIKE $${paramIndex}`)
+          conditions.push(`license_number ILIKE $${paramIndex}`)
+          
+          // Check if search terms match first_name and last_name separately
+          // e.g., "jack 02" -> (first_name ILIKE '%jack%' AND last_name ILIKE '%02%') OR (first_name ILIKE '%02%' AND last_name ILIKE '%jack%')
+          const term1 = `%${searchTerms[0]}%`
+          const term2 = `%${searchTerms[1]}%`
+          conditions.push(`(first_name ILIKE $${paramIndex + 1} AND last_name ILIKE $${paramIndex + 2})`)
+          conditions.push(`(first_name ILIKE $${paramIndex + 2} AND last_name ILIKE $${paramIndex + 1})`)
+          
+          driversQuery += ` AND (${conditions.join(' OR ')})`
+          params.push(searchPattern, term1, term2)
+          paramIndex += 3
+        } else {
+          // Single word: simple search across all fields
+          driversQuery += ` AND (
+            first_name ILIKE $${paramIndex} 
+            OR last_name ILIKE $${paramIndex} 
+            OR email ILIKE $${paramIndex}
+            OR license_number ILIKE $${paramIndex}
+            OR CONCAT(first_name, ' ', last_name) ILIKE $${paramIndex}
+            OR CONCAT(last_name, ' ', first_name) ILIKE $${paramIndex}
+          )`
+          params.push(searchPattern)
+          paramIndex++
+        }
       }
       
       driversQuery += ` ORDER BY last_name, first_name`

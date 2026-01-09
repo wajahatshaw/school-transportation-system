@@ -85,7 +85,18 @@ export function ComplianceAlertsBadge() {
             
             <div className="space-y-2">
               {expiredCount > 0 && (
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <button
+                  onClick={() => {
+                    setIsOpen(false)
+                    // Wait for dialog to close, then scroll
+                    setTimeout(() => {
+                      if (typeof window !== 'undefined' && (window as any).scrollToExpiringDocuments) {
+                        (window as any).scrollToExpiringDocuments()
+                      }
+                    }, 100)
+                  }}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-red-600"></div>
                     <span className="text-sm font-medium text-slate-900">Expired Documents</span>
@@ -93,11 +104,22 @@ export function ComplianceAlertsBadge() {
                   <Badge variant="danger" className="text-xs">
                     {expiredCount}
                   </Badge>
-                </div>
+                </button>
               )}
               
               {expiringCount > 0 && (
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
+                <button
+                  onClick={() => {
+                    setIsOpen(false)
+                    // Wait for dialog to close, then scroll
+                    setTimeout(() => {
+                      if (typeof window !== 'undefined' && (window as any).scrollToExpiringDocuments) {
+                        (window as any).scrollToExpiringDocuments()
+                      }
+                    }, 100)
+                  }}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-yellow-600"></div>
                     <span className="text-sm font-medium text-slate-900">Expiring Soon</span>
@@ -105,7 +127,7 @@ export function ComplianceAlertsBadge() {
                   <Badge variant="warning" className="text-xs">
                     {expiringCount}
                   </Badge>
-                </div>
+                </button>
               )}
             </div>
             
