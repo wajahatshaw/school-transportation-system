@@ -5,7 +5,9 @@ import { useState } from 'react'
 import { ComplianceSummaryCards } from './compliance-summary-cards'
 import { ComplianceDriversTable } from './compliance-drivers-table'
 import { ComplianceExpiringTable } from './compliance-expiring-table'
-import { TableSkeleton } from '@/components/ui/skeleton'
+import { TableSkeleton, CardSkeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { Download, Loader2 } from 'lucide-react'
 
 async function fetchComplianceSummary() {
   const res = await fetch('/api/compliance/summary')
@@ -52,6 +54,7 @@ export function CompliancePageClient() {
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
+  const [isExporting, setIsExporting] = useState(false)
   
   const summaryQuery = useQuery({
     queryKey: ['compliance-summary'],
@@ -73,14 +76,8 @@ export function CompliancePageClient() {
       statusFilter === 'all' ? undefined : statusFilter,
       searchQuery || undefined
     ),
-    // CRITICAL: Use cache immediately on mount if available
-    initialData: () => {
-      return queryClient.getQueryData(['compliance-drivers', statusFilter, searchQuery]) as any
-    },
-    initialDataUpdatedAt: () => {
-      return queryClient.getQueryState(['compliance-drivers', statusFilter, searchQuery])?.dataUpdatedAt
-    },
-    placeholderData: (previousData) => previousData,
+    // Don't use initialData - let React Query handle cache naturally
+    // This ensures isPending is true when query key changes and no cache exists
     retry: 1,
   })
   
@@ -92,12 +89,15 @@ export function CompliancePageClient() {
     console.error('Error fetching driver compliance:', driversQuery.error)
   }
   
-  // NEVER show loading if we have any data (cache exists)
-  // Only show loading on the very first load when genuinely no data
+  // Show loading when fetching (including when filters change)
   const hasSummaryData = !!summaryQuery.data
-  const hasDriversData = (driversQuery.data?.length ?? 0) > 0
-  const summaryLoading = summaryQuery.isPending && !hasSummaryData
-  const driversLoading = driversQuery.isPending && !hasDriversData
+  const summaryLoading = (summaryQuery.isFetching && !hasSummaryData) || (summaryQuery.isPending && !hasSummaryData)
+  
+  // For drivers: show skeleton when fetching new data (filter/search changed)
+  // isPending = waiting for initial data (new query key, no cache)
+  // isFetching = actively fetching (could be new query or background refetch)
+  // Show skeleton when pending (new query) OR when fetching and we don't have data yet
+  const driversLoading = driversQuery.isPending || (driversQuery.isFetching && driversQuery.data === undefined)
   
   const summary = summaryQuery.data
   
@@ -107,7 +107,7 @@ export function CompliancePageClient() {
       summaryLoading,
       driversLoading,
       hasSummaryData,
-      hasDriversData,
+      hasDriversData: driversQuery.data !== undefined,
       summary: summary ? {
         totalDrivers: summary.totalDrivers,
         compliantDrivers: summary.compliantDrivers,
@@ -149,7 +149,12 @@ export function CompliancePageClient() {
           </div>
         </div>
       ) : summaryLoading ? (
-        <TableSkeleton />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
       ) : summary ? (
         <ComplianceSummaryCards summary={summary} />
       ) : (
@@ -208,13 +213,45 @@ export function CompliancePageClient() {
               className="px-4 py-2 border border-slate-300 rounded-md text-sm flex-1 max-w-xs"
             />
             
-            <a
-              href="/api/compliance/report?format=csv"
-              download
-              className="px-4 py-2 bg-slate-900 text-white rounded-md text-sm font-medium hover:bg-slate-800"
+            <Button
+              onClick={async () => {
+                setIsExporting(true)
+                try {
+                  const response = await fetch('/api/compliance/report?format=csv')
+                  if (!response.ok) {
+                    throw new Error('Failed to export CSV')
+                  }
+                  const blob = await response.blob()
+                  const url = window.URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = `compliance-report-${new Date().toISOString().split('T')[0]}.csv`
+                  document.body.appendChild(a)
+                  a.click()
+                  window.URL.revokeObjectURL(url)
+                  document.body.removeChild(a)
+                } catch (error) {
+                  console.error('Error exporting CSV:', error)
+                  alert('Failed to export CSV. Please try again.')
+                } finally {
+                  setIsExporting(false)
+                }
+              }}
+              disabled={isExporting}
+              className="px-4 py-2 bg-slate-900 text-white rounded-md text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Export CSV
-            </a>
+              {isExporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export CSV
+                </>
+              )}
+            </Button>
           </div>
         </div>
         
