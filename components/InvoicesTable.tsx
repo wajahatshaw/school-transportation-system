@@ -32,6 +32,7 @@ export function InvoicesTable({ invoices, onUpdate }: InvoicesTableProps) {
   const [recordingPayment, setRecordingPayment] = useState<string | null>(null)
   const [editingInvoice, setEditingInvoice] = useState<string | null>(null)
   const [deletingInvoice, setDeletingInvoice] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -66,6 +67,7 @@ export function InvoicesTable({ invoices, onUpdate }: InvoicesTableProps) {
   const handleDelete = async () => {
     if (!deletingInvoice) return
     
+    setIsDeleting(true)
     try {
       const response = await fetch(`/api/invoices/${deletingInvoice}`, {
         method: 'DELETE',
@@ -89,6 +91,8 @@ export function InvoicesTable({ invoices, onUpdate }: InvoicesTableProps) {
         description: error.message || 'Please try again'
       })
       // Don't clear deletingInvoice on error so user can try again
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -366,7 +370,12 @@ export function InvoicesTable({ invoices, onUpdate }: InvoicesTableProps) {
           title="Cancel Invoice"
           description="Are you sure you want to cancel this invoice? This action cannot be undone."
           onConfirm={handleDelete}
-          onCancel={() => setDeletingInvoice(null)}
+          onCancel={() => {
+            if (!isDeleting) {
+              setDeletingInvoice(null)
+            }
+          }}
+          isLoading={isDeleting}
         />
       )}
     </>

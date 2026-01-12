@@ -2850,6 +2850,8 @@ export async function createInvoice(data: {
     const invoiceNumber = invoiceNumberResult[0].invoice_number
     
     // Create invoice
+    // If status is 'paid', set outstandingAmount to 0 and paidAmount to total
+    const isPaid = data.status === 'paid'
     const invoice = await tx.invoice.create({
       data: {
         tenantId: context.tenantId,
@@ -2860,15 +2862,35 @@ export async function createInvoice(data: {
         subtotal: data.subtotal,
         tax: data.tax ?? 0,
         total: data.total,
-        paidAmount: 0,
-        outstandingAmount: data.total,
+        paidAmount: isPaid ? data.total : 0,
+        outstandingAmount: isPaid ? 0 : data.total,
         notes: data.notes,
         createdBy: context.userId
       }
     })
     
-    // Create line items
+    // Validate and create line items
     for (const item of data.lineItems) {
+      // Validate route belongs to tenant if provided
+      if (item.routeId) {
+        const route = await tx.route.findFirst({
+          where: { id: item.routeId, tenantId: context.tenantId }
+        })
+        if (!route) {
+          throw new Error(`Route not found or access denied: ${item.routeId}`)
+        }
+      }
+      
+      // Validate student belongs to tenant if provided
+      if (item.studentId) {
+        const student = await tx.student.findFirst({
+          where: { id: item.studentId, tenantId: context.tenantId }
+        })
+        if (!student) {
+          throw new Error(`Student not found or access denied: ${item.studentId}`)
+        }
+      }
+      
       await tx.invoiceLineItem.create({
         data: {
           invoiceId: invoice.id,
@@ -2931,15 +2953,24 @@ export async function updateInvoice(
     }
     
     const updateData: any = {}
-    if (data.status !== undefined) updateData.status = data.status
+    if (data.status !== undefined) {
+      updateData.status = data.status
+      // If status is set to 'paid', ensure outstanding amount is 0
+      if (data.status === 'paid') {
+        updateData.outstandingAmount = 0
+        updateData.paidAmount = existing.total
+      }
+    }
     if (data.issueDate !== undefined) updateData.issueDate = data.issueDate
     if (data.dueDate !== undefined) updateData.dueDate = data.dueDate
     if (data.subtotal !== undefined) updateData.subtotal = data.subtotal
     if (data.tax !== undefined) updateData.tax = data.tax
     if (data.total !== undefined) {
       updateData.total = data.total
-      // Recalculate outstanding amount
-      updateData.outstandingAmount = data.total - existing.paidAmount
+      // Recalculate outstanding amount (unless status is being set to paid)
+      if (data.status !== 'paid') {
+        updateData.outstandingAmount = data.total - existing.paidAmount
+      }
     }
     if (data.notes !== undefined) updateData.notes = data.notes
     updateData.updatedAt = new Date()
@@ -2985,6 +3016,26 @@ export async function updateInvoice(
             }
           })
         } else {
+          // Validate route belongs to tenant if provided
+          if (item.routeId) {
+            const route = await tx.route.findFirst({
+              where: { id: item.routeId, tenantId: context.tenantId }
+            })
+            if (!route) {
+              throw new Error(`Route not found or access denied: ${item.routeId}`)
+            }
+          }
+          
+          // Validate student belongs to tenant if provided
+          if (item.studentId) {
+            const student = await tx.student.findFirst({
+              where: { id: item.studentId, tenantId: context.tenantId }
+            })
+            if (!student) {
+              throw new Error(`Student not found or access denied: ${item.studentId}`)
+            }
+          }
+          
           // Create new line item
           await tx.invoiceLineItem.create({
             data: {
@@ -3106,6 +3157,7 @@ export async function getOutstandingBalances() {
       SELECT COALESCE(SUM(outstanding_amount), 0) as total_outstanding
       FROM app.v_invoices
       WHERE outstanding_amount > 0
+        AND status != 'cancelled'
     `
     
     const statusResult = await tx.$queryRaw<Array<{
@@ -3115,6 +3167,7 @@ export async function getOutstandingBalances() {
       SELECT status, SUM(outstanding_amount) as amount
       FROM app.v_invoices
       WHERE outstanding_amount > 0
+        AND status != 'cancelled'
       GROUP BY status
     `
     
@@ -3180,9 +3233,9 @@ export async function getPaymentsSummary() {
       overdue_count: number
     }>>`
       SELECT 
-        COUNT(*) as total_invoices,
+        COUNT(*) FILTER (WHERE status != 'cancelled') as total_invoices,
         COALESCE(SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END), 0) as total_paid,
-        COALESCE(SUM(outstanding_amount), 0) as total_outstanding,
+        COALESCE(SUM(CASE WHEN status != 'cancelled' THEN outstanding_amount ELSE 0 END), 0) as total_outstanding,
         COUNT(*) FILTER (WHERE status = 'overdue' OR (due_date < CURRENT_DATE AND status NOT IN ('paid', 'cancelled'))) as overdue_count
       FROM app.v_invoices
     `

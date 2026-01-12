@@ -16,6 +16,7 @@ interface DeleteConfirmDialogProps {
   description: string
   onConfirm: () => void
   onCancel: () => void
+  isLoading?: boolean
 }
 
 export function DeleteConfirmDialog({
@@ -23,10 +24,11 @@ export function DeleteConfirmDialog({
   description,
   onConfirm,
   onCancel,
+  isLoading = false,
 }: DeleteConfirmDialogProps) {
   return (
-    <Dialog open={true} onOpenChange={onCancel}>
-      <DialogContent onClose={onCancel}>
+    <Dialog open={true} onOpenChange={(open) => !open && !isLoading && onCancel()}>
+      <DialogContent onClose={isLoading ? undefined : onCancel}>
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
@@ -39,11 +41,28 @@ export function DeleteConfirmDialog({
           <DialogDescription className="pt-3">{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onCancel}
+            disabled={isLoading}
+          >
             Cancel
           </Button>
-          <Button type="button" variant="destructive" onClick={onConfirm}>
-            Delete
+          <Button 
+            type="button" 
+            variant="destructive" 
+            onClick={onConfirm}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                Deleting...
+              </>
+            ) : (
+              'Delete'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

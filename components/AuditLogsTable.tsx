@@ -123,7 +123,7 @@ export function AuditLogsTable({ logs }: AuditLogsTableProps) {
                     </td>
                     <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">
                       <div className="scale-90 sm:scale-100 origin-left">
-                        {getActionBadge(log.action)}
+                      {getActionBadge(log.action)}
                       </div>
                     </td>
                     <td className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 whitespace-nowrap">

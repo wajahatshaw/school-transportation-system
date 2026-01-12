@@ -97,6 +97,16 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
     const newErrors: Record<string, string> = {}
     if (!formData.issueDate) newErrors.issueDate = 'Issue date is required'
     if (!formData.dueDate) newErrors.dueDate = 'Due date is required'
+    
+    // Validate due date is ahead of issue date
+    if (formData.issueDate && formData.dueDate) {
+      const issueDate = new Date(formData.issueDate)
+      const dueDate = new Date(formData.dueDate)
+      if (dueDate <= issueDate) {
+        newErrors.dueDate = 'Due date must be after issue date'
+      }
+    }
+    
     if (lineItems.length === 0) newErrors.lineItems = 'At least one line item is required'
 
     lineItems.forEach((item, index) => {
@@ -199,7 +209,19 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                 id="issueDate"
                 type="date"
                 value={formData.issueDate}
-                onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })}
+                max={formData.dueDate ? new Date(new Date(formData.dueDate).getTime() - 86400000).toISOString().split('T')[0] : undefined}
+                onChange={(e) => {
+                  const newIssueDate = e.target.value
+                  setFormData({ ...formData, issueDate: newIssueDate })
+                  // Clear error if date is valid
+                  if (formData.dueDate && newIssueDate) {
+                    const issueDate = new Date(newIssueDate)
+                    const dueDate = new Date(formData.dueDate)
+                    if (dueDate > issueDate && errors.dueDate) {
+                      setErrors({ ...errors, dueDate: '' })
+                    }
+                  }
+                }}
                 className={`h-10 ${errors.issueDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               />
               {errors.issueDate && (
@@ -214,7 +236,19 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                 id="dueDate"
                 type="date"
                 value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                min={formData.issueDate ? new Date(new Date(formData.issueDate).getTime() + 86400000).toISOString().split('T')[0] : undefined}
+                onChange={(e) => {
+                  const newDueDate = e.target.value
+                  setFormData({ ...formData, dueDate: newDueDate })
+                  // Clear error if date is valid
+                  if (formData.issueDate && newDueDate) {
+                    const issueDate = new Date(formData.issueDate)
+                    const dueDate = new Date(newDueDate)
+                    if (dueDate > issueDate && errors.dueDate) {
+                      setErrors({ ...errors, dueDate: '' })
+                    }
+                  }
+                }}
                 className={`h-10 ${errors.dueDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               />
               {errors.dueDate && (

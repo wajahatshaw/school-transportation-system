@@ -63,11 +63,79 @@ export function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecordPayment
     }
   }
 
-  if (!invoiceQuery.data) {
+  if (invoiceQuery.isLoading || !invoiceQuery.data) {
     return (
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent onClose={onClose}>
-          <div className="py-8 text-center">Loading...</div>
+        <DialogContent onClose={onClose} className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Invoice Details</DialogTitle>
+            <DialogDescription>Loading invoice data...</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="h-4 w-24 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-5 w-32 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 w-16 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-6 w-20 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 w-20 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-5 w-28 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 w-20 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-5 w-28 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="h-5 w-24 bg-slate-200 rounded animate-pulse"></div>
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="bg-slate-50 px-4 py-3">
+                  <div className="flex gap-4">
+                    <div className="h-4 w-24 bg-slate-200 rounded animate-pulse"></div>
+                    <div className="h-4 w-16 bg-slate-200 rounded animate-pulse"></div>
+                    <div className="h-4 w-20 bg-slate-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="divide-y divide-slate-200">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="px-4 py-3">
+                      <div className="flex gap-4">
+                        <div className="h-4 w-32 bg-slate-200 rounded animate-pulse"></div>
+                        <div className="h-4 w-16 bg-slate-200 rounded animate-pulse"></div>
+                        <div className="h-4 w-12 bg-slate-200 rounded animate-pulse ml-auto"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="h-5 w-20 bg-slate-200 rounded animate-pulse"></div>
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="bg-slate-50 px-4 py-3">
+                  <div className="flex gap-4">
+                    <div className="h-4 w-16 bg-slate-200 rounded animate-pulse"></div>
+                    <div className="h-4 w-20 bg-slate-200 rounded animate-pulse"></div>
+                    <div className="h-4 w-24 bg-slate-200 rounded animate-pulse"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-slate-200 pt-4 space-y-2">
+              <div className="flex justify-between">
+                <div className="h-4 w-20 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-4 w-24 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+              <div className="flex justify-between">
+                <div className="h-4 w-16 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-4 w-20 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     )

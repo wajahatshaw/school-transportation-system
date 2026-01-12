@@ -210,6 +210,16 @@ export function EditInvoiceModal({ isOpen, invoiceId, onClose, onSuccess }: Edit
     const newErrors: Record<string, string> = {}
     if (!formData.issueDate) newErrors.issueDate = 'Issue date is required'
     if (!formData.dueDate) newErrors.dueDate = 'Due date is required'
+    
+    // Validate due date is ahead of issue date
+    if (formData.issueDate && formData.dueDate) {
+      const issueDate = new Date(formData.issueDate)
+      const dueDate = new Date(formData.dueDate)
+      if (dueDate <= issueDate) {
+        newErrors.dueDate = 'Due date must be after issue date'
+      }
+    }
+    
     if (lineItems.length === 0) newErrors.lineItems = 'At least one line item is required'
 
     lineItems.forEach((item, index) => {
@@ -271,9 +281,40 @@ export function EditInvoiceModal({ isOpen, invoiceId, onClose, onSuccess }: Edit
   if (loading) {
     return (
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DialogContent onClose={onClose} className="max-w-4xl">
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"></div>
+        <DialogContent onClose={onClose} className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full mx-2 sm:mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Edit Invoice</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
+              Loading invoice data...
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="space-y-2">
+                <div className="h-4 w-16 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-10 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 w-20 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-10 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+              <div className="space-y-2">
+                <div className="h-4 w-20 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-10 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="h-4 w-16 bg-slate-200 rounded animate-pulse"></div>
+              <div className="h-24 bg-slate-200 rounded animate-pulse"></div>
+            </div>
+            <div className="space-y-4">
+              <div className="h-4 w-24 bg-slate-200 rounded animate-pulse"></div>
+              <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 space-y-4">
+                <div className="h-10 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-10 bg-slate-200 rounded animate-pulse"></div>
+                <div className="h-10 bg-slate-200 rounded animate-pulse"></div>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -318,7 +359,19 @@ export function EditInvoiceModal({ isOpen, invoiceId, onClose, onSuccess }: Edit
                 id="issueDate"
                 type="date"
                 value={formData.issueDate}
-                onChange={(e) => setFormData({ ...formData, issueDate: e.target.value })}
+                max={formData.dueDate ? new Date(new Date(formData.dueDate).getTime() - 86400000).toISOString().split('T')[0] : undefined}
+                onChange={(e) => {
+                  const newIssueDate = e.target.value
+                  setFormData({ ...formData, issueDate: newIssueDate })
+                  // Clear error if date is valid
+                  if (formData.dueDate && newIssueDate) {
+                    const issueDate = new Date(newIssueDate)
+                    const dueDate = new Date(formData.dueDate)
+                    if (dueDate > issueDate && errors.dueDate) {
+                      setErrors({ ...errors, dueDate: '' })
+                    }
+                  }
+                }}
                 className={`h-10 ${errors.issueDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               />
               {errors.issueDate && (
@@ -333,7 +386,19 @@ export function EditInvoiceModal({ isOpen, invoiceId, onClose, onSuccess }: Edit
                 id="dueDate"
                 type="date"
                 value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                min={formData.issueDate ? new Date(new Date(formData.issueDate).getTime() + 86400000).toISOString().split('T')[0] : undefined}
+                onChange={(e) => {
+                  const newDueDate = e.target.value
+                  setFormData({ ...formData, dueDate: newDueDate })
+                  // Clear error if date is valid
+                  if (formData.issueDate && newDueDate) {
+                    const issueDate = new Date(formData.issueDate)
+                    const dueDate = new Date(newDueDate)
+                    if (dueDate > issueDate && errors.dueDate) {
+                      setErrors({ ...errors, dueDate: '' })
+                    }
+                  }
+                }}
                 className={`h-10 ${errors.dueDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
               />
               {errors.dueDate && (

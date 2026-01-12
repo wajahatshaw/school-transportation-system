@@ -76,6 +76,33 @@ export async function PATCH(
     }
 
     const body = JSON.parse(text)
+    
+    // Validate due date is ahead of issue date if both are provided
+    if (body.issueDate && body.dueDate) {
+      const issueDateObj = new Date(body.issueDate)
+      const dueDateObj = new Date(body.dueDate)
+      if (dueDateObj <= issueDateObj) {
+        return NextResponse.json(
+          { error: 'Due date must be after issue date' },
+          { status: 400 }
+        )
+      }
+    }
+    
+    // Validate due date is ahead of issue date if only one is being updated
+    // We need to fetch the invoice first to check the other date
+    const existingInvoice = await getInvoice(invoiceId)
+    if (existingInvoice) {
+      const issueDate = body.issueDate ? new Date(body.issueDate) : new Date(existingInvoice.issueDate!)
+      const dueDate = body.dueDate ? new Date(body.dueDate) : new Date(existingInvoice.dueDate!)
+      if (dueDate <= issueDate) {
+        return NextResponse.json(
+          { error: 'Due date must be after issue date' },
+          { status: 400 }
+        )
+      }
+    }
+    
     const updateData: any = {}
 
     if (body.status !== undefined) updateData.status = body.status

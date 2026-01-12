@@ -81,6 +81,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate due date is ahead of issue date
+    const issueDateObj = new Date(issueDate)
+    const dueDateObj = new Date(dueDate)
+    if (dueDateObj <= issueDateObj) {
+      return NextResponse.json(
+        { error: 'Due date must be after issue date' },
+        { status: 400 }
+      )
+    }
+
     if (!Array.isArray(lineItems) || lineItems.length === 0) {
       return NextResponse.json(
         { error: 'At least one line item is required' },

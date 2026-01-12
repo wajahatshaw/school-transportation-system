@@ -188,124 +188,124 @@ export function AttendancePageClient({ role }: { role: string }) {
         {/* Filter Content - Hidden on mobile when collapsed */}
         <div className={`${isFiltersOpen ? 'block' : 'hidden'} sm:block px-3 sm:px-4 lg:px-6 pb-3 sm:pb-4 lg:pb-6`}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-            <div className="space-y-1.5">
+          <div className="space-y-1.5">
               <label className="block text-xs sm:text-sm font-medium text-slate-700">
-                Start Date
-              </label>
-              <div className="relative">
+              Start Date
+            </label>
+            <div className="relative">
                 <Calendar className="pointer-events-none absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
                   className={`${inputBase} pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm`}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs sm:text-sm font-medium text-slate-700">
-                End Date
-              </label>
-              <div className="relative">
-                <Calendar className="pointer-events-none absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className={`${inputBase} pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm`}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs sm:text-sm font-medium text-slate-700">
-                Route
-              </label>
-              <div className="relative">
-                <ChevronDown className="pointer-events-none absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
-                <select
-                  value={selectedRoute}
-                  onChange={(e) => setSelectedRoute(e.target.value)}
-                  className={`${selectBase} h-9 sm:h-10 text-xs sm:text-sm pr-8 sm:pr-10`}
-                  disabled={routesQuery.isLoading}
-                >
-                  <option value="">
-                    {routesQuery.isLoading ? 'Loading routes…' : 'All Routes'}
-                  </option>
-                  {routeOptions.map((route) => (
-                    <option key={route.id} value={route.id}>
-                      {route.name}
-                    </option>
-                  ))}
-                </select>
-                {routesQuery.isLoading && <Skeleton className="absolute inset-0 rounded-lg opacity-20" />}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs sm:text-sm font-medium text-slate-700">
-                Driver
-              </label>
-              <div className="relative">
-                <ChevronDown className="pointer-events-none absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
-                <select
-                  value={selectedDriver}
-                  onChange={(e) => setSelectedDriver(e.target.value)}
-                  className={`${selectBase} h-9 sm:h-10 text-xs sm:text-sm pr-8 sm:pr-10`}
-                  disabled={driversQuery.isLoading}
-                >
-                  <option value="">
-                    {driversQuery.isLoading ? 'Loading drivers…' : 'All Drivers'}
-                  </option>
-                  {driverOptions.map((driver) => (
-                    <option key={driver.id} value={driver.id}>
-                      {driver.firstName} {driver.lastName}
-                    </option>
-                  ))}
-                </select>
-                {driversQuery.isLoading && <Skeleton className="absolute inset-0 rounded-lg opacity-20" />}
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs sm:text-sm font-medium text-slate-700">
-                Type
-              </label>
-              <div className="relative">
-                <ChevronDown className="pointer-events-none absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
-                <select
-                  value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value as 'AM' | 'PM' | '')}
-                  className={`${selectBase} h-9 sm:h-10 text-xs sm:text-sm pr-8 sm:pr-10`}
-                >
-                  <option value="">AM & PM</option>
-                  <option value="AM">AM Only</option>
-                  <option value="PM">PM Only</option>
-                </select>
-              </div>
+              />
             </div>
           </div>
 
+          <div className="space-y-1.5">
+              <label className="block text-xs sm:text-sm font-medium text-slate-700">
+              End Date
+            </label>
+            <div className="relative">
+                <Calendar className="pointer-events-none absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                  className={`${inputBase} pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm`}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+              <label className="block text-xs sm:text-sm font-medium text-slate-700">
+              Route
+            </label>
+            <div className="relative">
+                <ChevronDown className="pointer-events-none absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
+              <select
+                value={selectedRoute}
+                onChange={(e) => setSelectedRoute(e.target.value)}
+                  className={`${selectBase} h-9 sm:h-10 text-xs sm:text-sm pr-8 sm:pr-10`}
+                disabled={routesQuery.isLoading}
+              >
+                <option value="">
+                  {routesQuery.isLoading ? 'Loading routes…' : 'All Routes'}
+                </option>
+                {routeOptions.map((route) => (
+                  <option key={route.id} value={route.id}>
+                    {route.name}
+                  </option>
+                ))}
+              </select>
+              {routesQuery.isLoading && <Skeleton className="absolute inset-0 rounded-lg opacity-20" />}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+              <label className="block text-xs sm:text-sm font-medium text-slate-700">
+              Driver
+            </label>
+            <div className="relative">
+                <ChevronDown className="pointer-events-none absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
+              <select
+                value={selectedDriver}
+                onChange={(e) => setSelectedDriver(e.target.value)}
+                  className={`${selectBase} h-9 sm:h-10 text-xs sm:text-sm pr-8 sm:pr-10`}
+                disabled={driversQuery.isLoading}
+              >
+                <option value="">
+                  {driversQuery.isLoading ? 'Loading drivers…' : 'All Drivers'}
+                </option>
+                {driverOptions.map((driver) => (
+                  <option key={driver.id} value={driver.id}>
+                    {driver.firstName} {driver.lastName}
+                  </option>
+                ))}
+              </select>
+              {driversQuery.isLoading && <Skeleton className="absolute inset-0 rounded-lg opacity-20" />}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+              <label className="block text-xs sm:text-sm font-medium text-slate-700">
+              Type
+            </label>
+            <div className="relative">
+                <ChevronDown className="pointer-events-none absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value as 'AM' | 'PM' | '')}
+                  className={`${selectBase} h-9 sm:h-10 text-xs sm:text-sm pr-8 sm:pr-10`}
+              >
+                <option value="">AM & PM</option>
+                <option value="AM">AM Only</option>
+                <option value="PM">PM Only</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 mt-4 sm:mt-5">
             <div className="flex gap-2 flex-1">
-              <Button
-                onClick={async () => {
-                  setApplied({
-                    startDate,
-                    endDate,
-                    routeId: selectedRoute,
-                    driverId: selectedDriver,
-                    routeType: selectedType,
-                  })
+          <Button
+            onClick={async () => {
+              setApplied({
+                startDate,
+                endDate,
+                routeId: selectedRoute,
+                driverId: selectedDriver,
+                routeType: selectedType,
+              })
                   setIsFiltersOpen(false) // Close on mobile after applying
-                }}
-                size="sm"
-                disabled={tripsQuery.isPending}
+            }}
+            size="sm"
+            disabled={tripsQuery.isPending}
                 className="flex-1 sm:flex-initial text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
-              >
-                {tripsQuery.isPending ? 'Loading…' : 'Apply Filters'}
-              </Button>
+          >
+            {tripsQuery.isPending ? 'Loading…' : 'Apply Filters'}
+          </Button>
               <Button 
                 onClick={handleClearFilters} 
                 variant="outline" 
@@ -314,12 +314,12 @@ export function AttendancePageClient({ role }: { role: string }) {
                 className="flex-1 sm:flex-initial text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
               >
                 Clear
-              </Button>
+          </Button>
             </div>
             <div className="text-[10px] sm:text-xs text-slate-500 flex items-center justify-center sm:justify-end sm:ml-auto pt-1 sm:pt-0">
-              {routesQuery.isLoading || driversQuery.isLoading
-                ? 'Loading lists…'
-                : `${routeOptions.length} routes • ${driverOptions.length} drivers`}
+            {routesQuery.isLoading || driversQuery.isLoading
+              ? 'Loading lists…'
+              : `${routeOptions.length} routes • ${driverOptions.length} drivers`}
             </div>
           </div>
         </div>

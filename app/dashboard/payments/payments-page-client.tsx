@@ -63,10 +63,15 @@ export function PaymentsPageClient() {
   })
 
   const handleRefresh = () => {
+    // Invalidate all payment-related queries to ensure data is fresh
     queryClient.invalidateQueries({ queryKey: ['payments-summary'] })
     queryClient.invalidateQueries({ queryKey: ['invoices'] })
     queryClient.invalidateQueries({ queryKey: ['outstanding-balances'] })
     queryClient.invalidateQueries({ queryKey: ['aging-report'] })
+    // Also refetch immediately to update UI
+    queryClient.refetchQueries({ queryKey: ['payments-summary'] })
+    queryClient.refetchQueries({ queryKey: ['outstanding-balances'] })
+    queryClient.refetchQueries({ queryKey: ['aging-report'] })
   }
 
   const summaryLoading = summaryQuery.isPending && !summaryQuery.data
