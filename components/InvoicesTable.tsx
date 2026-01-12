@@ -108,29 +108,30 @@ export function InvoicesTable({ invoices, onUpdate }: InvoicesTableProps) {
 
   return (
     <>
-      <div className="overflow-x-auto">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-200">
           <thead className="bg-slate-50">
             <tr>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <th className="px-4 lg:px-6 py-2.5 lg:py-3.5 text-left text-[10px] lg:text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 Invoice #
               </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <th className="px-4 lg:px-6 py-2.5 lg:py-3.5 text-left text-[10px] lg:text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 Issue Date
               </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <th className="px-4 lg:px-6 py-2.5 lg:py-3.5 text-left text-[10px] lg:text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 Due Date
               </th>
-              <th className="px-6 py-3.5 text-left text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <th className="px-4 lg:px-6 py-2.5 lg:py-3.5 text-left text-[10px] lg:text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 Status
               </th>
-              <th className="px-6 py-3.5 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <th className="px-4 lg:px-6 py-2.5 lg:py-3.5 text-right text-[10px] lg:text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 Total
               </th>
-              <th className="px-6 py-3.5 text-right text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <th className="px-4 lg:px-6 py-2.5 lg:py-3.5 text-right text-[10px] lg:text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 Outstanding
               </th>
-              <th className="px-6 py-3.5 text-center text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              <th className="px-4 lg:px-6 py-2.5 lg:py-3.5 text-center text-[10px] lg:text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -141,48 +142,46 @@ export function InvoicesTable({ invoices, onUpdate }: InvoicesTableProps) {
                 key={invoice.id}
                 className="transition-all duration-150 hover:bg-slate-50 border-b border-slate-100"
               >
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="text-sm font-semibold text-slate-900">
-                      {invoice.invoiceNumber}
-                    </div>
+                <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
+                  <div className="text-xs lg:text-sm font-semibold text-slate-900">
+                    {invoice.invoiceNumber}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-slate-700">
+                <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
+                  <div className="text-xs lg:text-sm text-slate-700">
                     {formatDate(invoice.issueDate)}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-slate-700">
+                <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
+                  <div className="text-xs lg:text-sm text-slate-700">
                     {formatDate(invoice.dueDate)}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
                   {getStatusBadge(invoice.status)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <div className="text-sm font-semibold text-slate-900">
+                <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-right">
+                  <div className="text-xs lg:text-sm font-semibold text-slate-900">
                     {formatCurrency(invoice.total)}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <div className={`text-sm font-semibold ${
+                <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap text-right">
+                  <div className={`text-xs lg:text-sm font-semibold ${
                     invoice.outstandingAmount > 0 ? 'text-red-600' : 'text-green-600'
                   }`}>
                     {formatCurrency(invoice.outstandingAmount)}
                   </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center justify-center gap-1.5">
+                <td className="px-4 lg:px-6 py-3 lg:py-4 whitespace-nowrap">
+                  <div className="flex items-center justify-center gap-1 sm:gap-1.5">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setViewingInvoice(invoice.id)}
-                      className="h-8 w-8 p-0 border-slate-300 hover:bg-slate-100 hover:border-slate-400"
+                      className="h-7 w-7 lg:h-8 lg:w-8 p-0 border-slate-300 hover:bg-slate-100 hover:border-slate-400"
                       title="View Details"
                     >
-                      <Eye className="h-4 w-4" />
+                      <Eye className="h-3 w-3 lg:h-4 lg:w-4" />
                     </Button>
                     {canEditOrDelete(invoice) && (
                       <>
@@ -190,28 +189,28 @@ export function InvoicesTable({ invoices, onUpdate }: InvoicesTableProps) {
                           variant="outline"
                           size="sm"
                           onClick={() => setEditingInvoice(invoice.id)}
-                          className="h-8 w-8 p-0 border-slate-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-600"
+                          className="h-7 w-7 lg:h-8 lg:w-8 p-0 border-slate-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-600"
                           title="Edit Invoice"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil className="h-3 w-3 lg:h-4 lg:w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setRecordingPayment(invoice.id)}
-                          className="h-8 w-8 p-0 border-slate-300 hover:bg-green-50 hover:border-green-400 hover:text-green-600"
+                          className="h-7 w-7 lg:h-8 lg:w-8 p-0 border-slate-300 hover:bg-green-50 hover:border-green-400 hover:text-green-600"
                           title="Record Payment"
                         >
-                          <CreditCard className="h-4 w-4" />
+                          <CreditCard className="h-3 w-3 lg:h-4 lg:w-4" />
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setDeletingInvoice(invoice.id)}
-                          className="h-8 w-8 p-0 border-slate-300 hover:bg-red-50 hover:border-red-400 hover:text-red-600"
+                          className="h-7 w-7 lg:h-8 lg:w-8 p-0 border-slate-300 hover:bg-red-50 hover:border-red-400 hover:text-red-600"
                           title="Cancel Invoice"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3 lg:h-4 lg:w-4" />
                         </Button>
                       </>
                     )}
@@ -220,10 +219,10 @@ export function InvoicesTable({ invoices, onUpdate }: InvoicesTableProps) {
                         variant="outline"
                         size="sm"
                         disabled
-                        className="h-8 w-8 p-0 border-slate-200 bg-slate-50 cursor-not-allowed opacity-50"
+                        className="h-7 w-7 lg:h-8 lg:w-8 p-0 border-slate-200 bg-slate-50 cursor-not-allowed opacity-50"
                         title="Invoice is paid and cannot be edited"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-3 w-3 lg:h-4 lg:w-4" />
                       </Button>
                     )}
                   </div>
@@ -232,6 +231,93 @@ export function InvoicesTable({ invoices, onUpdate }: InvoicesTableProps) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {invoices.map((invoice) => (
+          <div
+            key={invoice.id}
+            className="bg-white border border-slate-200 rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-slate-900 truncate">
+                  {invoice.invoiceNumber}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  {getStatusBadge(invoice.status)}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setViewingInvoice(invoice.id)}
+                  className="h-7 w-7 p-0 border-slate-300 hover:bg-slate-100"
+                  title="View"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </Button>
+                {canEditOrDelete(invoice) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditingInvoice(invoice.id)}
+                    className="h-7 w-7 p-0 border-slate-300 hover:bg-blue-50"
+                    title="Edit"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs mt-2 pt-2 border-t border-slate-100">
+              <div>
+                <span className="text-slate-500">Issue:</span>
+                <span className="ml-1 text-slate-700 font-medium">{formatDate(invoice.issueDate)}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Due:</span>
+                <span className="ml-1 text-slate-700 font-medium">{formatDate(invoice.dueDate)}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Total:</span>
+                <span className="ml-1 text-slate-900 font-semibold">{formatCurrency(invoice.total)}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Outstanding:</span>
+                <span className={`ml-1 font-semibold ${
+                  invoice.outstandingAmount > 0 ? 'text-red-600' : 'text-green-600'
+                }`}>
+                  {formatCurrency(invoice.outstandingAmount)}
+                </span>
+              </div>
+            </div>
+            {canEditOrDelete(invoice) && (
+              <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-slate-100">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRecordingPayment(invoice.id)}
+                  className="flex-1 h-8 text-xs border-slate-300 hover:bg-green-50"
+                >
+                  <CreditCard className="h-3.5 w-3.5 mr-1.5" />
+                  Payment
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeletingInvoice(invoice.id)}
+                  className="h-8 w-8 p-0 border-red-300 text-red-600 hover:bg-red-50"
+                  title="Cancel"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {viewingInvoice && (

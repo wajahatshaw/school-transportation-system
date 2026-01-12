@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Plus, CreditCard, FileText, DollarSign, AlertCircle, TrendingUp, Receipt } from 'lucide-react'
+import { Plus, CreditCard, FileText, DollarSign, AlertCircle, TrendingUp, Receipt, ChevronDown, ChevronUp } from 'lucide-react'
 import { InvoicesTable } from '@/components/InvoicesTable'
 import { CreateInvoiceModal } from '@/components/CreateInvoiceModal'
 import { OutstandingBalancesWidget } from '@/components/OutstandingBalancesWidget'
@@ -34,6 +34,7 @@ export function PaymentsPageClient() {
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
 
   const summaryQuery = useQuery({
     queryKey: ['payments-summary'],
@@ -95,49 +96,49 @@ export function PaymentsPageClient() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                <FileText className="h-6 w-6 text-slate-700" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-4 lg:p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 items-center justify-center rounded-full bg-slate-100 flex-shrink-0">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-slate-700" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-slate-600">Total Invoices</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{summary.totalInvoices}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                <DollarSign className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-slate-600">Total Paid</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(summary.totalPaid)}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-slate-600">Total Invoices</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">{summary.totalInvoices}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                <TrendingUp className="h-6 w-6 text-red-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-4 lg:p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 items-center justify-center rounded-full bg-green-100 flex-shrink-0">
+                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-green-600" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-slate-600">Outstanding</p>
-                <p className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(summary.totalOutstanding)}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-slate-600">Total Paid</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600 mt-0.5 sm:mt-1 truncate">{formatCurrency(summary.totalPaid)}</p>
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
-                <AlertCircle className="h-6 w-6 text-orange-600" />
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-4 lg:p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 items-center justify-center rounded-full bg-red-100 flex-shrink-0">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-red-600" />
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-slate-600">Overdue</p>
-                <p className="text-2xl font-bold text-orange-600 mt-1">{summary.overdueCount}</p>
-                <p className="text-xs text-slate-500 mt-1">Requires attention</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-slate-600">Outstanding</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-red-600 mt-0.5 sm:mt-1 truncate">{formatCurrency(summary.totalOutstanding)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-4 lg:p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 items-center justify-center rounded-full bg-orange-100 flex-shrink-0">
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-orange-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm font-medium text-slate-600">Overdue</p>
+                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600 mt-0.5 sm:mt-1 truncate">{summary.overdueCount}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 hidden sm:block">Requires attention</p>
               </div>
             </div>
           </div>
@@ -150,87 +151,108 @@ export function PaymentsPageClient() {
       </div>
 
       {/* Invoices Section */}
-      <div className="mt-6 bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-          <div className="flex items-center justify-between">
+      <div className="mt-4 sm:mt-6 bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-3 sm:px-4 lg:px-6 py-3 sm:py-4 border-b border-slate-200 bg-slate-50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-slate-700" />
+              <h2 className="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
+                <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-slate-700" />
                 Invoices
               </h2>
-              <p className="text-sm text-slate-600 mt-1">
+              <p className="text-xs sm:text-sm text-slate-600 mt-1">
                 Manage and track all your invoices
               </p>
             </div>
             <Button 
               onClick={() => setIsCreateModalOpen(true)}
-              className="bg-slate-900 hover:bg-slate-800 text-white"
+              className="bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 w-full sm:w-auto"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Invoice
+              <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+              <span className="hidden sm:inline">Create Invoice</span>
+              <span className="sm:hidden">Create</span>
             </Button>
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-3 sm:p-4 lg:p-6">
+          {/* Mobile: Collapsible Filter Header */}
+          <button
+            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+            className="w-full sm:hidden flex items-center justify-between mb-3 pb-3 border-b border-slate-200"
+          >
+            <span className="text-xs font-medium text-slate-700">Filter: {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}</span>
+            {isFiltersOpen ? (
+              <ChevronUp className="h-4 w-4 text-slate-600" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-slate-600" />
+            )}
+          </button>
+
           {/* Filter Buttons */}
-          <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-200">
-            <span className="text-sm font-medium text-slate-700 mr-2">Filter:</span>
-            <Button
-              variant={statusFilter === 'all' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('all')}
-              className={statusFilter === 'all' 
-                ? 'bg-slate-900 text-white hover:bg-slate-800' 
-                : 'bg-white hover:bg-slate-50'
-              }
-            >
-              All
-            </Button>
-            <Button
-              variant={statusFilter === 'draft' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('draft')}
-              className={statusFilter === 'draft' 
-                ? 'bg-slate-900 text-white hover:bg-slate-800' 
-                : 'bg-white hover:bg-slate-50'
-              }
-            >
-              Draft
-            </Button>
-            <Button
-              variant={statusFilter === 'sent' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('sent')}
-              className={statusFilter === 'sent' 
-                ? 'bg-slate-900 text-white hover:bg-slate-800' 
-                : 'bg-white hover:bg-slate-50'
-              }
-            >
-              Sent
-            </Button>
-            <Button
-              variant={statusFilter === 'paid' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('paid')}
-              className={statusFilter === 'paid' 
-                ? 'bg-slate-900 text-white hover:bg-slate-800' 
-                : 'bg-white hover:bg-slate-50'
-              }
-            >
-              Paid
-            </Button>
-            <Button
-              variant={statusFilter === 'overdue' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter('overdue')}
-              className={statusFilter === 'overdue' 
-                ? 'bg-slate-900 text-white hover:bg-slate-800' 
-                : 'bg-white hover:bg-slate-50'
-              }
-            >
-              Overdue
-            </Button>
+          <div className={`${isFiltersOpen ? 'block' : 'hidden'} sm:flex sm:flex-row sm:items-center gap-2 sm:gap-2 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-slate-200`}>
+            <span className="hidden sm:inline text-xs sm:text-sm font-medium text-slate-700 sm:mr-2">Filter:</span>
+            <div className="flex flex-wrap gap-1.5 sm:gap-2">
+              <Button
+                variant={statusFilter === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('all')}
+                className={`text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 h-7 sm:h-8 ${
+                  statusFilter === 'all' 
+                    ? 'bg-slate-900 text-white hover:bg-slate-800' 
+                    : 'bg-white hover:bg-slate-50'
+                }`}
+              >
+                All
+              </Button>
+              <Button
+                variant={statusFilter === 'draft' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('draft')}
+                className={`text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 h-7 sm:h-8 ${
+                  statusFilter === 'draft' 
+                    ? 'bg-slate-900 text-white hover:bg-slate-800' 
+                    : 'bg-white hover:bg-slate-50'
+                }`}
+              >
+                Draft
+              </Button>
+              <Button
+                variant={statusFilter === 'sent' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('sent')}
+                className={`text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 h-7 sm:h-8 ${
+                  statusFilter === 'sent' 
+                    ? 'bg-slate-900 text-white hover:bg-slate-800' 
+                    : 'bg-white hover:bg-slate-50'
+                }`}
+              >
+                Sent
+              </Button>
+              <Button
+                variant={statusFilter === 'paid' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('paid')}
+                className={`text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 h-7 sm:h-8 ${
+                  statusFilter === 'paid' 
+                    ? 'bg-slate-900 text-white hover:bg-slate-800' 
+                    : 'bg-white hover:bg-slate-50'
+                }`}
+              >
+                Paid
+              </Button>
+              <Button
+                variant={statusFilter === 'overdue' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setStatusFilter('overdue')}
+                className={`text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 h-7 sm:h-8 ${
+                  statusFilter === 'overdue' 
+                    ? 'bg-slate-900 text-white hover:bg-slate-800' 
+                    : 'bg-white hover:bg-slate-50'
+                }`}
+              >
+                Overdue
+              </Button>
+            </div>
           </div>
 
           {/* Table */}
@@ -246,13 +268,13 @@ export function PaymentsPageClient() {
       </div>
 
       {/* Aging Report */}
-      <div className="mt-6">
-        <div className="mb-4">
-          <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-slate-700" />
+      <div className="mt-4 sm:mt-6">
+        <div className="mb-3 sm:mb-4">
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-900 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-slate-700" />
             Aging Report
           </h2>
-          <p className="text-sm text-slate-600 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1">
             Track outstanding invoices by days past due
           </p>
         </div>

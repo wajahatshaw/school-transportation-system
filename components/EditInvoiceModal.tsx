@@ -282,7 +282,7 @@ export function EditInvoiceModal({ isOpen, invoiceId, onClose, onSuccess }: Edit
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent onClose={onClose} className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent onClose={onClose} className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full mx-2 sm:mx-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">Edit Invoice</DialogTitle>
           <DialogDescription className="text-sm text-slate-600">
@@ -290,8 +290,8 @@ export function EditInvoiceModal({ isOpen, invoiceId, onClose, onSuccess }: Edit
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-3 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div className="space-y-2">
               <Label htmlFor="status" className="text-sm font-medium text-slate-700">
                 Status <span className="text-red-500">*</span>
@@ -392,7 +392,7 @@ export function EditInvoiceModal({ isOpen, invoiceId, onClose, onSuccess }: Edit
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-slate-700">
                         Type <span className="text-red-500">*</span>
@@ -460,7 +460,7 @@ export function EditInvoiceModal({ isOpen, invoiceId, onClose, onSuccess }: Edit
                     )}
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                     <div className="space-y-2">
                       <Label className="text-sm font-medium text-slate-700">
                         Quantity <span className="text-red-500">*</span>

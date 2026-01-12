@@ -57,37 +57,37 @@ export function OutstandingBalancesWidget() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-          <DollarSign className="h-5 w-5 text-red-600" />
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-3 sm:p-4 lg:p-6">
+      <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full bg-red-100 flex-shrink-0">
+          <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
         </div>
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900">Outstanding Balances</h3>
-          <p className="text-sm text-slate-600">Amounts awaiting payment</p>
+        <div className="min-w-0">
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900">Outstanding Balances</h3>
+          <p className="text-xs sm:text-sm text-slate-600">Amounts awaiting payment</p>
         </div>
       </div>
       
-      <div className="space-y-6">
-        <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-          <p className="text-sm font-medium text-slate-600 mb-1">Total Outstanding</p>
-          <p className="text-3xl font-bold text-red-600">
+      <div className="space-y-4 sm:space-y-6">
+        <div className="bg-slate-50 rounded-lg p-3 sm:p-4 border border-slate-200">
+          <p className="text-xs sm:text-sm font-medium text-slate-600 mb-1">Total Outstanding</p>
+          <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-600 break-words">
             {formatCurrency(balances.totalOutstanding)}
           </p>
         </div>
 
         {Object.keys(balances.byStatus || {}).length > 0 && (
-          <div className="border-t border-slate-200 pt-4">
-            <p className="text-sm font-semibold text-slate-900 mb-3">Breakdown by Status</p>
-            <div className="space-y-3">
+          <div className="border-t border-slate-200 pt-3 sm:pt-4">
+            <p className="text-xs sm:text-sm font-semibold text-slate-900 mb-2 sm:mb-3">Breakdown by Status</p>
+            <div className="space-y-2 sm:space-y-3">
               {Object.entries(balances.byStatus).map(([status, amount]: [string, any]) => (
-                <div key={status} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <div className="flex items-center gap-2">
-                    <Badge className={getStatusColor(status)}>
+                <div key={status} className="flex items-center justify-between p-2 sm:p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Badge className={`${getStatusColor(status)} text-xs`}>
                       {status.charAt(0).toUpperCase() + status.slice(1)}
                     </Badge>
                   </div>
-                  <span className="text-lg font-semibold text-slate-900">
+                  <span className="text-sm sm:text-base lg:text-lg font-semibold text-slate-900 ml-2 whitespace-nowrap">
                     {formatCurrency(Number(amount))}
                   </span>
                 </div>

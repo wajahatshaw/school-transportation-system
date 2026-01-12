@@ -7,7 +7,7 @@ import { ComplianceDriversTable } from './compliance-drivers-table'
 import { ComplianceExpiringTable } from './compliance-expiring-table'
 import { TableSkeleton, CardSkeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
-import { Download, Loader2 } from 'lucide-react'
+import { Download, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
 
 async function fetchComplianceSummary() {
   const res = await fetch('/api/compliance/summary')
@@ -55,6 +55,7 @@ export function CompliancePageClient() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [isExporting, setIsExporting] = useState(false)
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   
   const summaryQuery = useQuery({
     queryKey: ['compliance-summary'],
@@ -176,16 +177,34 @@ export function CompliancePageClient() {
       )}
       
       {/* Drivers Compliance Table */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4 sm:p-6">
         <div className="mb-4">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">Driver Compliance</h2>
+          <h2 className="text-lg sm:text-xl font-semibold text-slate-900 mb-3 sm:mb-4">Driver Compliance</h2>
           
+          {/* Mobile: Collapsible Filter Header */}
+          <button
+            onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+            className="w-full sm:hidden flex items-center justify-between mb-3 pb-3 border-b border-slate-200"
+          >
+            <span className="text-xs font-medium text-slate-700">
+              {statusFilter === 'all' ? 'All' : statusFilter === 'compliant' ? 'Compliant' : 'Non-Compliant'} {searchQuery && `• "${searchQuery}"`}
+            </span>
+            {isFiltersOpen ? (
+              <ChevronUp className="h-4 w-4 text-slate-600" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-slate-600" />
+            )}
+          </button>
+
           {/* Filters */}
-          <div className="flex gap-4 items-center mb-4">
-            <div className="flex gap-2">
+          <div className={`${isFiltersOpen ? 'block' : 'hidden'} space-y-3 sm:space-y-0 sm:flex sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center mb-4`}>
+            <div className="flex gap-1.5 sm:gap-2 flex-wrap">
               <button
-                onClick={() => setStatusFilter('all')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                onClick={() => {
+                  setStatusFilter('all')
+                  setIsFiltersOpen(false)
+                }}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap h-8 sm:h-9 ${
                   statusFilter === 'all'
                     ? 'bg-slate-900 text-white'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -194,8 +213,11 @@ export function CompliancePageClient() {
                 All
               </button>
               <button
-                onClick={() => setStatusFilter('compliant')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                onClick={() => {
+                  setStatusFilter('compliant')
+                  setIsFiltersOpen(false)
+                }}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap h-8 sm:h-9 ${
                   statusFilter === 'compliant'
                     ? 'bg-slate-900 text-white'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -204,8 +226,11 @@ export function CompliancePageClient() {
                 Compliant
               </button>
               <button
-                onClick={() => setStatusFilter('non_compliant')}
-                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                onClick={() => {
+                  setStatusFilter('non_compliant')
+                  setIsFiltersOpen(false)
+                }}
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-md text-xs sm:text-sm font-medium whitespace-nowrap h-8 sm:h-9 ${
                   statusFilter === 'non_compliant'
                     ? 'bg-slate-900 text-white'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -215,41 +240,42 @@ export function CompliancePageClient() {
               </button>
             </div>
             
-            <input
-              type="text"
-              placeholder="Search drivers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="px-4 py-2 border border-slate-300 rounded-md text-sm flex-1 max-w-xs"
-            />
-            
-            <Button
-              onClick={async () => {
-                setIsExporting(true)
-                try {
-                  const response = await fetch('/api/compliance/report?format=csv')
-                  if (!response.ok) {
-                    throw new Error('Failed to export CSV')
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-1 min-w-0">
+              <input
+                type="text"
+                placeholder="Search drivers..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 border border-slate-300 rounded-md text-xs sm:text-sm w-full sm:flex-1 sm:min-w-0 sm:max-w-xs h-8 sm:h-9"
+              />
+              
+              <Button
+                onClick={async () => {
+                  setIsExporting(true)
+                  try {
+                    const response = await fetch('/api/compliance/report?format=csv')
+                    if (!response.ok) {
+                      throw new Error('Failed to export CSV')
+                    }
+                    const blob = await response.blob()
+                    const url = window.URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `compliance-report-${new Date().toISOString().split('T')[0]}.csv`
+                    document.body.appendChild(a)
+                    a.click()
+                    window.URL.revokeObjectURL(url)
+                    document.body.removeChild(a)
+                  } catch (error) {
+                    console.error('Error exporting CSV:', error)
+                    alert('Failed to export CSV. Please try again.')
+                  } finally {
+                    setIsExporting(false)
                   }
-                  const blob = await response.blob()
-                  const url = window.URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = `compliance-report-${new Date().toISOString().split('T')[0]}.csv`
-                  document.body.appendChild(a)
-                  a.click()
-                  window.URL.revokeObjectURL(url)
-                  document.body.removeChild(a)
-                } catch (error) {
-                  console.error('Error exporting CSV:', error)
-                  alert('Failed to export CSV. Please try again.')
-                } finally {
-                  setIsExporting(false)
-                }
-              }}
-              disabled={isExporting}
-              className="px-4 py-2 bg-slate-900 text-white rounded-md text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+                }}
+                disabled={isExporting}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-900 text-white rounded-md text-xs sm:text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap w-full sm:w-auto shrink-0"
+              >
               {isExporting ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -261,7 +287,8 @@ export function CompliancePageClient() {
                   Export CSV
                 </>
               )}
-            </Button>
+              </Button>
+            </div>
           </div>
         </div>
         
@@ -294,7 +321,10 @@ export function CompliancePageClient() {
         ) : driversLoading ? (
           <TableSkeleton />
         ) : (
-          <ComplianceDriversTable drivers={driversQuery.data || []} />
+          <ComplianceDriversTable 
+            key={`${statusFilter}-${searchQuery}`}
+            drivers={driversQuery.data || []} 
+          />
         )}
       </div>
       

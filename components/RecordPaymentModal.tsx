@@ -112,7 +112,7 @@ export function RecordPaymentModal({ invoiceId, isOpen, onClose, onSuccess }: Re
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent onClose={onClose}>
+      <DialogContent onClose={onClose} className="w-[95vw] sm:w-full mx-2 sm:mx-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">Record Payment</DialogTitle>
           <DialogDescription className="text-sm text-slate-600">
