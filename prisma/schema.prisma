@@ -23,6 +23,9 @@ model Tenant {
   complianceRules             ComplianceRule[]
   complianceSnapshots         ComplianceSnapshot[]
   complianceAlerts            ComplianceAlert[]
+  invoices                    Invoice[]
+  invoiceLineItems            InvoiceLineItem[]
+  payments                    Payment[]
 
   @@map("tenants")
 }
@@ -72,6 +75,7 @@ model Student {
   tenant     Tenant              @relation(fields: [tenantId], references: [id])
   route      Route?              @relation(fields: [routeId], references: [id])
   attendance AttendanceRecord[]
+  invoiceLineItems InvoiceLineItem[]
 
   @@map("students")
 }
@@ -262,6 +266,7 @@ model Route {
   driver    Driver?     @relation(fields: [driverId], references: [id])
   students  Student[]
   trips     RouteTrip[]
+  invoiceLineItems InvoiceLineItem[]
 
   @@map("routes")
 }
@@ -303,3 +308,73 @@ model AttendanceRecord {
   @@map("attendance_records")
 }
 
+model Invoice {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  invoiceNumber   String   @unique @map("invoice_number")
+  status          String   @default("draft") // draft, sent, paid, overdue, cancelled
+  issueDate       DateTime @map("issue_date") @db.Date
+  dueDate         DateTime @map("due_date") @db.Date
+  subtotal        Decimal  @db.Decimal(10, 2)
+  tax             Decimal? @default(0) @db.Decimal(10, 2)
+  total           Decimal  @db.Decimal(10, 2)
+  paidAmount      Decimal  @default(0) @map("paid_amount") @db.Decimal(10, 2)
+  outstandingAmount Decimal @map("outstanding_amount") @db.Decimal(10, 2)
+  notes           String?  @db.Text
+  createdBy       String   @map("created_by") @db.Uuid
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  lineItems       InvoiceLineItem[]
+  payments        Payment[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, issueDate])
+  @@index([tenantId, dueDate])
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoiceId   String   @map("invoice_id") @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  itemType    String   @map("item_type") // "route", "student", "route-day"
+  routeId     String?  @map("route_id") @db.Uuid
+  studentId   String?  @map("student_id") @db.Uuid
+  description String   @db.Text
+  quantity    Decimal  @db.Decimal(10, 2) // number of days for route-days, count for students/routes
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  route       Route?   @relation(fields: [routeId], references: [id])
+  student     Student? @relation(fields: [studentId], references: [id])
+
+  @@index([invoiceId])
+  @@index([tenantId])
+  @@map("invoice_line_items")
+}
+
+model Payment {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  invoiceId       String   @map("invoice_id") @db.Uuid
+  amount          Decimal  @db.Decimal(10, 2)
+  paymentDate     DateTime @map("payment_date") @db.Date
+  paymentMethod   String   @map("payment_method") // cash, check, bank_transfer, credit_card, other
+  referenceNumber String?  @map("reference_number")
+  notes           String?  @db.Text
+  recordedBy      String   @map("recorded_by") @db.Uuid
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([tenantId, paymentDate])
+  @@map("payments")
+}

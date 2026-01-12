@@ -2619,3 +2619,580 @@ export async function getStudentsForTrip(tripId: string) {
   })
 }
 
+// ============================================================================
+// PAYMENTS & INVOICES CRUD - All operations rely on RLS
+// ============================================================================
+
+export async function getInvoices(filters?: {
+  status?: string
+  startDate?: Date
+  endDate?: Date
+  search?: string
+}) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    let query = `
+      SELECT * FROM app.v_invoices
+      WHERE 1=1
+    `
+    const params: any[] = []
+    let paramIndex = 1
+    
+    if (filters?.status) {
+      query += ` AND status = $${paramIndex}`
+      params.push(filters.status)
+      paramIndex++
+    }
+    
+    if (filters?.startDate) {
+      query += ` AND issue_date >= $${paramIndex}`
+      params.push(filters.startDate)
+      paramIndex++
+    }
+    
+    if (filters?.endDate) {
+      query += ` AND issue_date <= $${paramIndex}`
+      params.push(filters.endDate)
+      paramIndex++
+    }
+    
+    if (filters?.search) {
+      query += ` AND (invoice_number ILIKE $${paramIndex} OR notes ILIKE $${paramIndex})`
+      params.push(`%${filters.search}%`)
+      paramIndex++
+    }
+    
+    query += ` ORDER BY created_at DESC`
+    
+    const invoices = await tx.$queryRawUnsafe<Array<{
+      id: string
+      tenant_id: string
+      invoice_number: string
+      status: string
+      issue_date: Date
+      due_date: Date
+      subtotal: number
+      tax: number | null
+      total: number
+      paid_amount: number
+      outstanding_amount: number
+      notes: string | null
+      created_by: string
+      created_at: Date | null
+      updated_at: Date | null
+    }>>(query, ...params)
+    
+    return invoices.map(inv => ({
+      id: inv.id,
+      tenantId: inv.tenant_id,
+      invoiceNumber: inv.invoice_number,
+      status: inv.status,
+      issueDate: inv.issue_date,
+      dueDate: inv.due_date,
+      subtotal: Number(inv.subtotal),
+      tax: inv.tax ? Number(inv.tax) : null,
+      total: Number(inv.total),
+      paidAmount: Number(inv.paid_amount),
+      outstandingAmount: Number(inv.outstanding_amount),
+      notes: inv.notes,
+      createdBy: inv.created_by,
+      createdAt: inv.created_at,
+      updatedAt: inv.updated_at
+    }))
+  })
+}
+
+export async function getInvoice(invoiceId: string) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    const invoice = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      invoice_number: string
+      status: string
+      issue_date: Date
+      due_date: Date
+      subtotal: number
+      tax: number | null
+      total: number
+      paid_amount: number
+      outstanding_amount: number
+      notes: string | null
+      created_by: string
+      created_at: Date | null
+      updated_at: Date | null
+    }>>`
+      SELECT * FROM app.v_invoices
+      WHERE id = ${invoiceId}::uuid
+      LIMIT 1
+    `
+    
+    if (!invoice || invoice.length === 0) {
+      return null
+    }
+    
+    const inv = invoice[0]
+
+    // Get line items
+    const lineItems = await tx.$queryRaw<Array<{
+      id: string
+      invoice_id: string
+      item_type: string
+      route_id: string | null
+      student_id: string | null
+      description: string
+      quantity: number
+      unit_price: number
+      total: number
+      created_at: Date | null
+    }>>`
+      SELECT * FROM app.v_invoice_line_items
+      WHERE invoice_id = ${invoiceId}::uuid
+      ORDER BY COALESCE(created_at, '1970-01-01'::timestamp) ASC
+    `
+    
+    // Get payments
+    const payments = await tx.$queryRaw<Array<{
+      id: string
+      tenant_id: string
+      invoice_id: string
+      amount: number
+      payment_date: Date
+      payment_method: string
+      reference_number: string | null
+      notes: string | null
+      recorded_by: string
+      created_at: Date | null
+      updated_at: Date | null
+    }>>`
+      SELECT * FROM app.v_payments
+      WHERE invoice_id = ${invoiceId}::uuid
+      ORDER BY payment_date DESC, created_at DESC
+    `
+    
+    // Format dates to ISO strings for JSON serialization
+    const formatDate = (date: Date | null) => {
+      if (!date) return null
+      return date instanceof Date ? date.toISOString() : new Date(date).toISOString()
+    }
+    
+    return {
+      id: inv.id,
+      tenantId: inv.tenant_id,
+      invoiceNumber: inv.invoice_number,
+      status: inv.status,
+      issueDate: formatDate(inv.issue_date),
+      dueDate: formatDate(inv.due_date),
+      subtotal: Number(inv.subtotal),
+      tax: inv.tax ? Number(inv.tax) : null,
+      total: Number(inv.total),
+      paidAmount: Number(inv.paid_amount),
+      outstandingAmount: Number(inv.outstanding_amount),
+      notes: inv.notes,
+      createdBy: inv.created_by,
+      createdAt: inv.created_at ? formatDate(inv.created_at) : null,
+      updatedAt: inv.updated_at ? formatDate(inv.updated_at) : null,
+      lineItems: lineItems.map(li => ({
+        id: li.id,
+        invoiceId: li.invoice_id,
+        itemType: li.item_type,
+        routeId: li.route_id,
+        studentId: li.student_id,
+        description: li.description,
+        quantity: Number(li.quantity),
+        unitPrice: Number(li.unit_price),
+        total: Number(li.total)
+      })),
+      payments: payments.map(p => ({
+        id: p.id,
+        tenantId: p.tenant_id,
+        invoiceId: p.invoice_id,
+        amount: Number(p.amount),
+        paymentDate: p.payment_date,
+        paymentMethod: p.payment_method,
+        referenceNumber: p.reference_number,
+        notes: p.notes,
+        recordedBy: p.recorded_by,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at
+      }))
+    }
+  })
+}
+
+export async function createInvoice(data: {
+  status?: string
+  issueDate: Date
+  dueDate: Date
+  subtotal: number
+  tax?: number
+  total: number
+  notes?: string
+  lineItems: Array<{
+    itemType: string
+    routeId?: string
+    studentId?: string
+    description: string
+    quantity: number
+    unitPrice: number
+    total: number
+  }>
+}) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    // Generate invoice number
+    const invoiceNumberResult = await tx.$queryRaw<Array<{ invoice_number: string }>>`
+      SELECT app.generate_invoice_number(${context.tenantId}::uuid) as invoice_number
+    `
+    const invoiceNumber = invoiceNumberResult[0].invoice_number
+    
+    // Create invoice
+    const invoice = await tx.invoice.create({
+      data: {
+        tenantId: context.tenantId,
+        invoiceNumber,
+        status: data.status || 'draft',
+        issueDate: data.issueDate,
+        dueDate: data.dueDate,
+        subtotal: data.subtotal,
+        tax: data.tax ?? 0,
+        total: data.total,
+        paidAmount: 0,
+        outstandingAmount: data.total,
+        notes: data.notes,
+        createdBy: context.userId
+      }
+    })
+    
+    // Create line items
+    for (const item of data.lineItems) {
+      await tx.invoiceLineItem.create({
+        data: {
+          invoiceId: invoice.id,
+          tenantId: context.tenantId,
+          itemType: item.itemType,
+          routeId: item.routeId || null,
+          studentId: item.studentId || null,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total: item.total
+        }
+      })
+    }
+    
+    revalidatePath('/dashboard/payments')
+    revalidatePath('/dashboard/audit-logs')
+    
+    return invoice
+  })
+}
+
+export async function updateInvoice(
+  invoiceId: string,
+  data: {
+    status?: string
+    issueDate?: Date
+    dueDate?: Date
+    subtotal?: number
+    tax?: number
+    total?: number
+    notes?: string
+    lineItems?: Array<{
+      id?: string
+      itemType: string
+      routeId?: string
+      studentId?: string
+      description: string
+      quantity: number
+      unitPrice: number
+      total: number
+    }>
+  }
+) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    const existing = await tx.invoice.findFirst({
+      where: { id: invoiceId, tenantId: context.tenantId },
+      include: { lineItems: true }
+    })
+    
+    if (!existing) {
+      throw new Error('Invoice not found or access denied')
+    }
+
+    // Check if invoice can be edited (not paid or cancelled)
+    if (existing.status === 'paid' || existing.status === 'cancelled') {
+      throw new Error(`Cannot edit invoice with status: ${existing.status}`)
+    }
+    
+    const updateData: any = {}
+    if (data.status !== undefined) updateData.status = data.status
+    if (data.issueDate !== undefined) updateData.issueDate = data.issueDate
+    if (data.dueDate !== undefined) updateData.dueDate = data.dueDate
+    if (data.subtotal !== undefined) updateData.subtotal = data.subtotal
+    if (data.tax !== undefined) updateData.tax = data.tax
+    if (data.total !== undefined) {
+      updateData.total = data.total
+      // Recalculate outstanding amount
+      updateData.outstandingAmount = data.total - existing.paidAmount
+    }
+    if (data.notes !== undefined) updateData.notes = data.notes
+    updateData.updatedAt = new Date()
+    
+    const invoice = await tx.invoice.update({
+      where: { id: invoiceId },
+      data: updateData
+    })
+
+    // Update line items if provided
+    if (data.lineItems !== undefined) {
+      // Get existing line item IDs
+      const existingLineItemIds = existing.lineItems.map(item => item.id)
+      const newLineItemIds = data.lineItems
+        .map(item => item.id)
+        .filter((id): id is string => !!id)
+
+      // Delete line items that are no longer in the list
+      const itemsToDelete = existingLineItemIds.filter(id => !newLineItemIds.includes(id))
+      if (itemsToDelete.length > 0) {
+        await tx.invoiceLineItem.deleteMany({
+          where: {
+            id: { in: itemsToDelete },
+            invoiceId: invoiceId
+          }
+        })
+      }
+
+      // Update or create line items
+      for (const item of data.lineItems) {
+        if (item.id && existingLineItemIds.includes(item.id)) {
+          // Update existing line item
+          await tx.invoiceLineItem.update({
+            where: { id: item.id },
+            data: {
+              itemType: item.itemType,
+              routeId: item.routeId || null,
+              studentId: item.studentId || null,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              total: item.total
+            }
+          })
+        } else {
+          // Create new line item
+          await tx.invoiceLineItem.create({
+            data: {
+              invoiceId: invoice.id,
+              tenantId: context.tenantId,
+              itemType: item.itemType,
+              routeId: item.routeId || null,
+              studentId: item.studentId || null,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              total: item.total
+            }
+          })
+        }
+      }
+    }
+    
+    revalidatePath('/dashboard/payments')
+    revalidatePath(`/dashboard/payments/${invoiceId}`)
+    revalidatePath('/dashboard/audit-logs')
+    
+    return invoice
+  })
+}
+
+export async function cancelInvoice(invoiceId: string) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    const existing = await tx.invoice.findFirst({
+      where: { id: invoiceId, tenantId: context.tenantId }
+    })
+    
+    if (!existing) {
+      throw new Error('Invoice not found or access denied')
+    }
+    
+    if (existing.status === 'paid') {
+      throw new Error('Cannot cancel a paid invoice')
+    }
+    
+    const invoice = await tx.invoice.update({
+      where: { id: invoiceId },
+      data: {
+        status: 'cancelled',
+        updatedAt: new Date()
+      }
+    })
+    
+    revalidatePath('/dashboard/payments')
+    revalidatePath(`/dashboard/payments/${invoiceId}`)
+    revalidatePath('/dashboard/audit-logs')
+    
+    return invoice
+  })
+}
+
+export async function recordPayment(
+  invoiceId: string,
+  data: {
+    amount: number
+    paymentDate: Date
+    paymentMethod: string
+    referenceNumber?: string
+    notes?: string
+  }
+) {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    const invoice = await tx.invoice.findFirst({
+      where: { id: invoiceId, tenantId: context.tenantId }
+    })
+    
+    if (!invoice) {
+      throw new Error('Invoice not found or access denied')
+    }
+    
+    if (invoice.status === 'cancelled') {
+      throw new Error('Cannot record payment for a cancelled invoice')
+    }
+    
+    // Validate payment amount doesn't exceed outstanding
+    const newOutstanding = invoice.outstandingAmount - data.amount
+    if (newOutstanding < 0) {
+      throw new Error('Payment amount exceeds outstanding balance')
+    }
+    
+    // Create payment (trigger will update invoice automatically)
+    const payment = await tx.payment.create({
+      data: {
+        tenantId: context.tenantId,
+        invoiceId: invoiceId,
+        amount: data.amount,
+        paymentDate: data.paymentDate,
+        paymentMethod: data.paymentMethod,
+        referenceNumber: data.referenceNumber,
+        notes: data.notes,
+        recordedBy: context.userId
+      }
+    })
+    
+    revalidatePath('/dashboard/payments')
+    revalidatePath(`/dashboard/payments/${invoiceId}`)
+    revalidatePath('/dashboard/audit-logs')
+    
+    return payment
+  })
+}
+
+export async function getOutstandingBalances() {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    const totalResult = await tx.$queryRaw<Array<{
+      total_outstanding: number
+    }>>`
+      SELECT COALESCE(SUM(outstanding_amount), 0) as total_outstanding
+      FROM app.v_invoices
+      WHERE outstanding_amount > 0
+    `
+    
+    const statusResult = await tx.$queryRaw<Array<{
+      status: string
+      amount: number
+    }>>`
+      SELECT status, SUM(outstanding_amount) as amount
+      FROM app.v_invoices
+      WHERE outstanding_amount > 0
+      GROUP BY status
+    `
+    
+    const byStatus: Record<string, number> = {}
+    statusResult.forEach((row: any) => {
+      byStatus[row.status] = Number(row.amount)
+    })
+    
+    return {
+      totalOutstanding: Number(totalResult[0]?.total_outstanding || 0),
+      byStatus
+    }
+  })
+}
+
+export async function getAgingReport() {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    const result = await tx.$queryRaw<Array<{
+      invoice_id: string
+      invoice_number: string
+      due_date: Date
+      outstanding_amount: number
+      days_past_due: number
+    }>>`
+      SELECT 
+        id as invoice_id,
+        invoice_number,
+        due_date,
+        outstanding_amount,
+        CASE 
+          WHEN due_date >= CURRENT_DATE THEN 0
+          ELSE CURRENT_DATE - due_date
+        END as days_past_due
+      FROM app.v_invoices
+      WHERE outstanding_amount > 0
+        AND status != 'cancelled'
+      ORDER BY due_date ASC
+    `
+    
+    return result.map(r => ({
+      invoiceId: r.invoice_id,
+      invoiceNumber: r.invoice_number,
+      dueDate: r.due_date,
+      outstandingAmount: Number(r.outstanding_amount),
+      daysPastDue: Number(r.days_past_due),
+      agingBucket: r.days_past_due <= 30 ? 'current' :
+                   r.days_past_due <= 60 ? '31-60' :
+                   r.days_past_due <= 90 ? '61-90' : '90+'
+    }))
+  })
+}
+
+export async function getPaymentsSummary() {
+  const context = await getTenantContext()
+  
+  return await withTenantContext(context, async (tx) => {
+    const result = await tx.$queryRaw<Array<{
+      total_invoices: number
+      total_paid: number
+      total_outstanding: number
+      overdue_count: number
+    }>>`
+      SELECT 
+        COUNT(*) as total_invoices,
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN total ELSE 0 END), 0) as total_paid,
+        COALESCE(SUM(outstanding_amount), 0) as total_outstanding,
+        COUNT(*) FILTER (WHERE status = 'overdue' OR (due_date < CURRENT_DATE AND status NOT IN ('paid', 'cancelled'))) as overdue_count
+      FROM app.v_invoices
+    `
+    
+    return {
+      totalInvoices: Number(result[0]?.total_invoices || 0),
+      totalPaid: Number(result[0]?.total_paid || 0),
+      totalOutstanding: Number(result[0]?.total_outstanding || 0),
+      overdueCount: Number(result[0]?.overdue_count || 0)
+    }
+  })
+}
+

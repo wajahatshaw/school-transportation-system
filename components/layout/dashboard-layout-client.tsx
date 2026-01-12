@@ -11,7 +11,8 @@ import {
   Route,
   FileCheck, 
   ScrollText,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  CreditCard
 } from 'lucide-react'
 import { InstantNavLink } from '@/components/InstantNavLink'
 import { Sidebar, TopBar } from '@/components/layout/header'
@@ -39,6 +40,7 @@ export function DashboardLayoutClient({ children, tenantName, userEmail, tenantI
     { href: '/dashboard/operations?tab=trips', label: 'Trips', icon: Route },
     { href: '/dashboard/operations?tab=attendance', label: 'Attendance', icon: ClipboardCheck },
     { href: '/dashboard/compliance', label: 'Compliance', icon: FileCheck },
+    { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
     { href: '/dashboard/audit-logs', label: 'Audit Logs', icon: ScrollText },
     { href: '/dashboard/settings', label: 'Settings', icon: SettingsIcon },
   ]
