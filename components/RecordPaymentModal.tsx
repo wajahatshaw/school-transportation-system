@@ -11,7 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Input, Label } from '@/components/ui/input'
+import { Input, Label, Select } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 interface RecordPaymentModalProps {
@@ -36,7 +36,10 @@ export function RecordPaymentModal({ invoiceId, isOpen, onClose, onSuccess }: Re
     queryKey: ['invoice', invoiceId],
     queryFn: async () => {
       const response = await fetch(`/api/invoices/${invoiceId}`)
-      if (!response.ok) throw new Error('Failed to fetch invoice')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: response.statusText }))
+        throw new Error(errorData.error || `Failed to fetch invoice: ${response.status}`)
+      }
       const data = await response.json()
       return data.data
     },
@@ -111,15 +114,17 @@ export function RecordPaymentModal({ invoiceId, isOpen, onClose, onSuccess }: Re
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent onClose={onClose}>
         <DialogHeader>
-          <DialogTitle>Record Payment</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-xl font-semibold">Record Payment</DialogTitle>
+          <DialogDescription className="text-sm text-slate-600">
             Record a payment for invoice {invoiceQuery.data?.invoiceNumber || invoiceId}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="amount">Amount *</Label>
+          <div className="space-y-2">
+            <Label htmlFor="amount" className="text-sm font-medium text-slate-700">
+              Amount <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="amount"
               type="number"
@@ -129,68 +134,95 @@ export function RecordPaymentModal({ invoiceId, isOpen, onClose, onSuccess }: Re
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               placeholder={`Max: $${outstandingAmount.toFixed(2)}`}
-              className={errors.amount ? 'border-red-500' : ''}
+              className={`h-10 ${errors.amount ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
             />
-            {errors.amount && <p className="text-sm text-red-500 mt-1">{errors.amount}</p>}
+            {errors.amount && (
+              <p className="text-xs text-red-500 mt-1">{errors.amount}</p>
+            )}
             <p className="text-xs text-slate-500 mt-1">
               Outstanding balance: ${outstandingAmount.toFixed(2)}
             </p>
           </div>
 
-          <div>
-            <Label htmlFor="paymentDate">Payment Date *</Label>
+          <div className="space-y-2">
+            <Label htmlFor="paymentDate" className="text-sm font-medium text-slate-700">
+              Payment Date <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="paymentDate"
               type="date"
               value={formData.paymentDate}
               onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
-              className={errors.paymentDate ? 'border-red-500' : ''}
+              className={`h-10 ${errors.paymentDate ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
             />
-            {errors.paymentDate && <p className="text-sm text-red-500 mt-1">{errors.paymentDate}</p>}
+            {errors.paymentDate && (
+              <p className="text-xs text-red-500 mt-1">{errors.paymentDate}</p>
+            )}
           </div>
 
-          <div>
-            <Label htmlFor="paymentMethod">Payment Method *</Label>
-            <select
+          <div className="space-y-2">
+            <Label htmlFor="paymentMethod" className="text-sm font-medium text-slate-700">
+              Payment Method <span className="text-red-500">*</span>
+            </Label>
+            <Select
               id="paymentMethod"
               value={formData.paymentMethod}
               onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md"
+              className={`h-10 ${errors.paymentMethod ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
             >
               <option value="cash">Cash</option>
               <option value="check">Check</option>
               <option value="bank_transfer">Bank Transfer</option>
               <option value="credit_card">Credit Card</option>
               <option value="other">Other</option>
-            </select>
-            {errors.paymentMethod && <p className="text-sm text-red-500 mt-1">{errors.paymentMethod}</p>}
+            </Select>
+            {errors.paymentMethod && (
+              <p className="text-xs text-red-500 mt-1">{errors.paymentMethod}</p>
+            )}
           </div>
 
-          <div>
-            <Label htmlFor="referenceNumber">Reference Number</Label>
+          <div className="space-y-2">
+            <Label htmlFor="referenceNumber" className="text-sm font-medium text-slate-700">
+              Reference Number
+            </Label>
             <Input
               id="referenceNumber"
               value={formData.referenceNumber}
               onChange={(e) => setFormData({ ...formData, referenceNumber: e.target.value })}
               placeholder="Check number, transaction ID, etc."
+              className="h-10"
             />
           </div>
 
-          <div>
-            <Label htmlFor="notes">Notes</Label>
-            <Input
+          <div className="space-y-2">
+            <Label htmlFor="notes" className="text-sm font-medium text-slate-700">
+              Notes
+            </Label>
+            <textarea
               id="notes"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Optional notes..."
+              rows={3}
+              className="flex w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
             />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
+          <DialogFooter className="gap-2">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={onClose} 
+              disabled={isPending}
+              className="border-slate-300"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button 
+              type="submit" 
+              disabled={isPending}
+              className="bg-slate-900 hover:bg-slate-800 text-white"
+            >
               {isPending ? 'Recording...' : 'Record Payment'}
             </Button>
           </DialogFooter>

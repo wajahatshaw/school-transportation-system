@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { invoiceId: string } }
+  { params }: { params: Promise<{ invoiceId: string }> }
 ) {
   try {
     const session = await getSession()
@@ -26,6 +26,7 @@ export async function POST(
       )
     }
 
+    const { invoiceId } = await params
     const text = await request.text()
     if (!text || text.trim() === '') {
       return NextResponse.json(
@@ -44,7 +45,7 @@ export async function POST(
       )
     }
 
-    const payment = await recordPayment(params.invoiceId, {
+    const payment = await recordPayment(invoiceId, {
       amount: Number(amount),
       paymentDate: new Date(paymentDate),
       paymentMethod,
